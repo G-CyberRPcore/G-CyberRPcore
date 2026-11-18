@@ -11,6 +11,6 @@ file = [
 
 cef_url = "./ui/index.html"
 
-use_game_natives = "true"
+use_game_natives = true
 
 hotreload = true
