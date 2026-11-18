@@ -293,8 +293,132 @@ mp.events.onClient('g-cyber:admin:broadcast', (player, text) => {
   });
 });
 
-// Command: setadmin <id> on server console
+// Teleport to coordinates
+mp.events.onClient('g-cyber:admin:teleportCoords', (player, x, y, z) => {
+  if (player && typeof player.position !== 'undefined') {
+    player.position = [parseFloat(x), parseFloat(y), parseFloat(z)];
+    player.emit('g-cyber:client:notify', 'Teleport', `Teleported to [${x}, ${y}, ${z}]`, 'success');
+  }
+});
+
+// Player Lifecycle Hooks
+mp.events.on('playerConnecting', (tempId, name) => {
+  console.log(`[Connect] Incoming connection from ${name} (TempID: ${tempId})`);
+});
+
+mp.events.on('playerConnected', (playerId, tempId) => {
+  const player = mp.players.at(playerId);
+  if (!player) return;
+  console.log(`[G-CyberRPcore] Citizen ${player.nickname || 'Unknown'} (ID #${playerId}) connected.`);
+});
+
+mp.events.on('playerSpawn', (playerId) => {
+  const player = mp.players.at(playerId);
+  if (!player) return;
+  console.log(`[G-CyberRPcore] Citizen #${playerId} spawned in world.`);
+  player.emit('g-cyber:client:startRoster');
+});
+
+// =====================================================================
+// SERVER COMMANDS (F8 Console & Server Terminal Registry)
+// =====================================================================
 if (mp.commands) {
+  // Command: admin / adminmenu / a / hub
+  mp.commands.add('admin', (player, args) => {
+    if (player) {
+      player.emit('g-cyber:client:toggleAdmin');
+    } else {
+      console.log('[Admin] Admin command is for in-game players.');
+    }
+  });
+  mp.commands.add('adminmenu', (player, args) => {
+    if (player) player.emit('g-cyber:client:toggleAdmin');
+  });
+  mp.commands.add('a', (player, args) => {
+    if (player) player.emit('g-cyber:client:toggleAdmin');
+  });
+  mp.commands.add('hub', (player, args) => {
+    if (player) player.emit('g-cyber:client:toggleAdmin');
+  });
+
+  // Command: noclip
+  mp.commands.add('noclip', (player, args) => {
+    if (player) player.emit('g-cyber:client:toggleNoclip');
+  });
+
+  // Command: god
+  mp.commands.add('god', (player, args) => {
+    if (player) player.emit('g-cyber:client:toggleGod');
+  });
+
+  // Command: tp <district> or <x> <y> <z>
+  mp.commands.add('tp', (player, args) => {
+    if (player && args && args.length > 0) {
+      player.emit('g-cyber:client:teleportCommand', args);
+    }
+  });
+
+  // Command: car / veh <model>
+  mp.commands.add('car', (player, args) => {
+    if (player) {
+      const model = (args && args.length > 0) ? args[0] : 'QuadraTurboR';
+      mp.events.emit('g-cyber:admin:spawnVehicle', player, model);
+    }
+  });
+  mp.commands.add('veh', (player, args) => {
+    if (player) {
+      const model = (args && args.length > 0) ? args[0] : 'QuadraTurboR';
+      mp.events.emit('g-cyber:admin:spawnVehicle', player, model);
+    }
+  });
+
+  // Command: char / multichar
+  mp.commands.add('char', (player, args) => {
+    if (player) player.emit('g-cyber:client:startRoster');
+  });
+  mp.commands.add('multichar', (player, args) => {
+    if (player) player.emit('g-cyber:client:startRoster');
+  });
+
+  // Command: skin / clothing
+  mp.commands.add('skin', (player, args) => {
+    if (player) player.emit('g-cyber:client:showCreator');
+  });
+  mp.commands.add('clothing', (player, args) => {
+    if (player) player.emit('g-cyber:client:showCreator');
+  });
+
+  // Command: revive
+  mp.commands.add('revive', (player, args) => {
+    if (player) {
+      const targetId = (args && args.length > 0) ? parseInt(args[0]) : player.id;
+      mp.events.emit('g-cyber:server:adminPlayerAction', player, 'revive', targetId);
+    }
+  });
+
+  // Command: heal
+  mp.commands.add('heal', (player, args) => {
+    if (player) {
+      const targetId = (args && args.length > 0) ? parseInt(args[0]) : player.id;
+      mp.events.emit('g-cyber:server:adminPlayerAction', player, 'heal', targetId);
+    }
+  });
+
+  // Command: spawn (re-spawns at default position)
+  mp.commands.add('spawn', (player, args) => {
+    if (player) player.emit('g-cyber:client:respawn');
+  });
+
+  // Command: ping
+  mp.commands.add('ping', (player, args) => {
+    if (player) {
+      player.emit('chat:add', `Latency: ${player.ping || 0}ms. Server active.`, 'system');
+    } else {
+      console.log('[Server] G-CyberRPcore is running.');
+    }
+  });
+
+  // Command: setadmin <id> on server console
   mp.commands.add('setadmin', (player, args) => {
     if (args && args.length > 0) {
       const targetId = parseInt(args[0]);
