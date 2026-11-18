@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="75%">
+      <stop offset="0%" stop-color="#0e1726" />
+      <stop offset="60%" stop-color="#070a10" />
+      <stop offset="100%" stop-color="#020408" />
+    </radialGradient>
+
+    <!-- Neon Yellow Glow -->
+    <filter id="glowYellow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur1" />
+      <feGaussianBlur stdDeviation="24" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Neon Cyan Glow -->
+    <filter id="glowCyan" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur1" />
+      <feGaussianBlur stdDeviation="20" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Neon Magenta Glow -->
+    <filter id="glowPink" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Gradient Fills -->
+    <linearGradient id="gradCyanPink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f0ff" />
+      <stop offset="50%" stop-color="#7928ca" />
+      <stop offset="100%" stop-color="#ff003c" />
+    </linearGradient>
+
+    <linearGradient id="gradYellowCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fcee0a" />
+      <stop offset="100%" stop-color="#00f0ff" />
+    </linearGradient>
+
+    <linearGradient id="techBorder" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff003c" />
+      <stop offset="50%" stop-color="#00f0ff" />
+      <stop offset="100%" stop-color="#fcee0a" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1000" height="1000" fill="url(#bgGrad)" />
+
+  <!-- Cyberpunk Grid Lines -->
+  <g opacity="0.12" stroke="#00f0ff" stroke-width="1">
+    <line x1="0" y1="200" x2="1000" y2="200" />
+    <line x1="0" y1="400" x2="1000" y2="400" />
+    <line x1="0" y1="600" x2="1000" y2="600" />
+    <line x1="0" y1="800" x2="1000" y2="800" />
+    <line x1="200" y1="0" x2="200" y2="1000" />
+    <line x1="400" y1="0" x2="400" y2="1000" />
+    <line x1="600" y1="0" x2="600" y2="1000" />
+    <line x1="800" y1="0" x2="800" y2="1000" />
+  </g>
+
+  <!-- Hexagonal Tech Shield Outer -->
+  <polygon points="500,70 880,240 880,720 500,900 120,720 120,240" 
+           fill="none" stroke="url(#techBorder)" stroke-width="4" opacity="0.7" />
+
+  <!-- Inner Angled Tech Frame -->
+  <polygon points="500,105 845,260 845,700 500,865 155,700 155,260" 
+           fill="#090d16" fill-opacity="0.9" stroke="#00f0ff" stroke-width="2" />
+
+  <!-- Circuit Lines & Data Nodes -->
+  <g stroke="#00f0ff" stroke-width="2" opacity="0.4" fill="none">
+    <path d="M 155 350 L 250 350 L 320 420" />
+    <path d="M 845 350 L 750 350 L 680 420" />
+    <path d="M 155 600 L 270 600 L 330 550" />
+    <path d="M 845 600 L 730 600 L 670 550" />
+    <circle cx="320" cy="420" r="4" fill="#00f0ff" />
+    <circle cx="680" cy="420" r="4" fill="#00f0ff" />
+    <circle cx="330" cy="550" r="4" fill="#ff003c" />
+    <circle cx="670" cy="550" r="4" fill="#ff003c" />
+  </g>
+
+  <!-- Central Processor / Cybernetic Core Backing -->
+  <rect x="330" y="270" width="340" height="340" rx="16" 
+        fill="#04060a" stroke="#ff003c" stroke-width="2.5" opacity="0.9" />
+
+  <!-- Microchip CPU Pins -->
+  <g stroke="#fcee0a" stroke-width="3" opacity="0.6">
+    <!-- Top Pins -->
+    <line x1="390" y1="270" x2="390" y2="245" />
+    <line x1="440" y1="270" x2="440" y2="245" />
+    <line x1="500" y1="270" x2="500" y2="240" />
+    <line x1="560" y1="270" x2="560" y2="245" />
+    <line x1="610" y1="270" x2="610" y2="245" />
+    <!-- Bottom Pins -->
+    <line x1="390" y1="610" x2="390" y2="635" />
+    <line x1="440" y1="610" x2="440" y2="635" />
+    <line x1="500" y1="610" x2="500" y2="640" />
+    <line x1="560" y1="610" x2="560" y2="635" />
+    <line x1="610" y1="610" x2="610" y2="635" />
+    <!-- Left Pins -->
+    <line x1="330" y1="330" x2="305" y2="330" />
+    <line x1="330" y1="390" x2="305" y2="390" />
+    <line x1="330" y1="450" x2="300" y2="450" />
+    <line x1="330" y1="510" x2="305" y2="510" />
+    <line x1="330" y1="560" x2="305" y2="560" />
+    <!-- Right Pins -->
+    <line x1="670" y1="330" x2="695" y2="330" />
+    <line x1="670" y1="390" x2="695" y2="390" />
+    <line x1="670" y1="450" x2="700" y2="450" />
+    <line x1="670" y1="510" x2="695" y2="510" />
+    <line x1="670" y1="560" x2="695" y2="560" />
+  </g>
+
+  <!-- THE ICONIC "G" EMBLEM -->
+  <!-- Stylized Cybernetic "G" Shape with Glowing Polygons and Cuts -->
+  <g filter="url(#glowCyan)">
+    <!-- Main Outer Loop of "G" -->
+    <path d="M 590 320 
+             L 420 320 
+             A 120 120 0 0 0 380 540 
+             L 420 560 
+             A 120 120 0 0 0 590 560 
+             L 590 440 
+             L 500 440 
+             L 500 480 
+             L 545 480 
+             L 545 520 
+             A 80 80 0 0 1 425 520 
+             L 405 500 
+             A 80 80 0 0 1 425 365 
+             L 590 365 
+             Z" 
+          fill="url(#gradCyanPink)" />
+  </g>
+
+  <!-- High-Tech Neon Core Notch in the Center of "G" -->
+  <polygon points="500,420 530,440 500,460 470,440" fill="#fcee0a" filter="url(#glowYellow)" />
+
+  <!-- BRAND NAME TYPOGRAPHY -->
+  <g text-anchor="middle" font-family="'Impact', 'Rajdhani', 'Segoe UI Black', sans-serif">
+    <!-- "G - CYBER" -->
+    <text x="500" y="730" font-size="72" font-weight="900" fill="#ffffff" letter-spacing="8" filter="url(#glowCyan)">
+      G-CYBER
+    </text>
+    <text x="500" y="730" font-size="72" font-weight="900" fill="#00f0ff" letter-spacing="8">
+      G-CYBER
+    </text>
+
+    <!-- "RPCORE" SUB-HEADER -->
+    <text x="500" y="790" font-size="38" font-weight="800" fill="#fcee0a" letter-spacing="18" filter="url(#glowYellow)">
+      RPCORE
+    </text>
+
+    <!-- SLOGAN -->
+    <text x="500" y="830" font-size="14" font-weight="600" fill="#94a3b8" letter-spacing="5" text-transform="uppercase">
+      THE MODULAR CYBERPUNK 2077 ROLEPLAY FRAMEWORK
+    </text>
+  </g>
+
+  <!-- Glowing Accent Dots / LED Status Indicators -->
+  <circle cx="500" cy="115" r="5" fill="#fcee0a" filter="url(#glowYellow)" />
+  <circle cx="830" cy="270" r="4" fill="#ff003c" filter="url(#glowPink)" />
+  <circle cx="170" cy="270" r="4" fill="#00f0ff" filter="url(#glowCyan)" />
+  <circle cx="830" cy="690" r="4" fill="#00f0ff" filter="url(#glowCyan)" />
+  <circle cx="170" cy="690" r="4" fill="#ff003c" filter="url(#glowPink)" />
+  <circle cx="500" cy="855" r="5" fill="#00f0ff" filter="url(#glowCyan)" />
+</svg>
