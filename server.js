@@ -7,16 +7,18 @@ console.log('[G-CyberRPcore] Server runtime initialized. Framework active.');
 
 // Paycheck Routine (Every 15 minutes)
 setInterval(() => {
-  G_CyberCore.Functions.GetPlayers().forEach(player => {
-    const job = player.PlayerData.job;
-    if (job && job.payment > 0) {
-      if (!job.offDutyPay && !job.onDuty) return;
+  if (global.G_CyberCore) {
+    global.G_CyberCore.Functions.GetPlayers().forEach(player => {
+      const job = player.PlayerData.job;
+      if (job && job.payment > 0) {
+        if (!job.offDutyPay && !job.onDuty) return;
 
-      player.Functions.AddMoney('bank', job.payment, `Salary: ${job.label}`);
-    }
-  });
-  console.log('[G-CyberRPcore Economy] Periodic salaries deposited.');
+        player.Functions.AddMoney('bank', job.payment, `Salary: ${job.label}`);
+      }
+    });
+  }
 }, 15 * 60 * 1000);
 
-// Export for other modular resources
-module.exports = G_CyberCore;
+if (typeof module !== 'undefined') {
+  module.exports = G_CyberCore;
+}
