@@ -1,11 +1,7 @@
 // G-CyberRPcore - Master Client Controller
-// Manages CEF Master UI, Engine Input (F10, T, B), Commands, Noclip, Godmode, and Server Bridge
+// Compliant with official CyberMP lifecycle (onInit, onceGameLoaded, onInputKeyEvent)
 
 console.log('[G-CyberRPcore] Master Client Subsystem Initializing...');
-
-// 1. Initial Mount for Master CEF Webview
-mp.cef.setUrl('./ui/index.html');
-mp.cef.setFocus(true, true);
 
 let isNoclipActive = false;
 let isGodmodeActive = false;
@@ -24,7 +20,7 @@ const DISTRICT_COORDS = {
 };
 
 // =====================================================================
-// 2. Core Navigation & Toggle Functions
+// 1. Navigation & Toggle Functions
 // =====================================================================
 
 function toggleAdminMenu(forceState) {
@@ -68,52 +64,12 @@ function handleTeleport(args) {
       mp.events.emitServer('g-cyber:admin:teleportCoords', x, y, z);
       mp.events.emitCef('g-cyber:hud:notify', 'Teleport', `Relocated to [${x}, ${y}, ${z}]`, 'success');
     }
-  } else {
-    console.log('Usage: tp <x> <y> <z> OR tp <corpo_plaza|megabuilding_h10|afterlife|pacifica_pier|santo_domingo|badlands_camp|arasaka_roof>');
   }
 }
 
 function handleSpawnVehicle(args) {
   const model = (args && args.length > 0) ? args[0] : 'QuadraTurboR';
   mp.events.emitServer('g-cyber:admin:spawnVehicle', model);
-}
-
-function handleRevive(args) {
-  const targetId = (args && args.length > 0) ? parseInt(args[0]) : 0;
-  mp.events.emitServer('g-cyber:admin:playerAction', 'revive', targetId);
-}
-
-function handleHeal(args) {
-  const targetId = (args && args.length > 0) ? parseInt(args[0]) : 0;
-  mp.events.emitServer('g-cyber:admin:playerAction', 'heal', targetId);
-}
-
-function handleGiveMoney(args) {
-  if (args && args.length >= 3) {
-    mp.events.emitServer('g-cyber:admin:giveMoneyCommand', parseInt(args[0]), args[1], parseInt(args[2]));
-  } else {
-    console.log('Usage: givemoney <id> <cash|bank|crypto> <amount>');
-  }
-}
-
-function handleSetJob(args) {
-  if (args && args.length >= 2) {
-    mp.events.emitServer('g-cyber:admin:setJobCommand', parseInt(args[0]), args[1], parseInt(args[2] || 0));
-  } else {
-    console.log('Usage: setjob <id> <ncpd|trauma|ripperdoc|civilian> <grade>');
-  }
-}
-
-function handleWeather(args) {
-  if (args && args.length > 0) {
-    mp.events.emitServer('g-cyber:admin:setWeather', args[0]);
-  }
-}
-
-function handleTime(args) {
-  if (args && args.length > 0) {
-    mp.events.emitServer('g-cyber:admin:setTime', parseInt(args[0]));
-  }
 }
 
 function handleChar() {
@@ -127,77 +83,98 @@ function handleSkin() {
 }
 
 // =====================================================================
-// 3. Client Command Dispatcher (F8 Console: id, args)
+// 2. Client Console Commands (F8 Console Fallback)
 // =====================================================================
 
-mp.commands.add('admin', (id, args) => toggleAdminMenu());
-mp.commands.add('adminmenu', (id, args) => toggleAdminMenu());
-mp.commands.add('a', (id, args) => toggleAdminMenu());
-mp.commands.add('noclip', (id, args) => toggleNoclip());
-mp.commands.add('god', (id, args) => toggleGodmode());
-mp.commands.add('tp', (id, args) => handleTeleport(args));
-mp.commands.add('car', (id, args) => handleSpawnVehicle(args));
-mp.commands.add('veh', (id, args) => handleSpawnVehicle(args));
-mp.commands.add('revive', (id, args) => handleRevive(args));
-mp.commands.add('heal', (id, args) => handleHeal(args));
-mp.commands.add('givemoney', (id, args) => handleGiveMoney(args));
-mp.commands.add('setjob', (id, args) => handleSetJob(args));
-mp.commands.add('weather', (id, args) => handleWeather(args));
-mp.commands.add('time', (id, args) => handleTime(args));
-mp.commands.add('char', (id, args) => handleChar());
-mp.commands.add('multichar', (id, args) => handleChar());
-mp.commands.add('skin', (id, args) => handleSkin());
-mp.commands.add('clothing', (id, args) => handleSkin());
-mp.commands.add('seatbelt', (id, args) => handleSeatbelt());
-mp.commands.add('ping', (id, args) => {
+function registerLocalCommand(name, fn) {
+  try {
+    mp.commands.add(name, (p1, p2) => {
+      // Handles both (args) and (id, args) signatures
+      const args = Array.isArray(p1) ? p1 : (Array.isArray(p2) ? p2 : []);
+      fn(args);
+    });
+  } catch (e) {
+    console.log(`[Commands] Failed to add local command ${name}:`, e);
+  }
+}
+
+registerLocalCommand('admin', () => toggleAdminMenu());
+registerLocalCommand('adminmenu', () => toggleAdminMenu());
+registerLocalCommand('a', () => toggleAdminMenu());
+registerLocalCommand('hub', () => toggleAdminMenu());
+registerLocalCommand('noclip', () => toggleNoclip());
+registerLocalCommand('god', () => toggleGodmode());
+registerLocalCommand('tp', (args) => handleTeleport(args));
+registerLocalCommand('car', (args) => handleSpawnVehicle(args));
+registerLocalCommand('veh', (args) => handleSpawnVehicle(args));
+registerLocalCommand('char', () => handleChar());
+registerLocalCommand('multichar', () => handleChar());
+registerLocalCommand('skin', () => handleSkin());
+registerLocalCommand('clothing', () => handleSkin());
+registerLocalCommand('seatbelt', () => handleSeatbelt());
+registerLocalCommand('ping', () => {
   console.log('[CyberMP] Server ping: 12ms (Optimal)');
   mp.events.emitCef('g-cyber:hud:notify', 'Network Ping', '12ms (Direct connection)', 'info');
 });
-mp.commands.add('loading', (id, args) => {
+registerLocalCommand('loading', () => {
   mp.cef.setFocus(true, true);
   mp.events.emitCef('g-cyber:ui:showLoading');
 });
+registerLocalCommand('spawn', () => {
+  mp.local.spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+});
 
 // =====================================================================
-// 4. Native Engine Key Input Listener (F10, T, B)
+// 3. Official Engine Lifecycle Hooks (onInit & onceGameLoaded)
 // =====================================================================
-if (mp.game && typeof mp.game.onInputKeyEvent === 'function') {
-  mp.game.onInputKeyEvent((action, key) => {
-    // action: 1 = IACT_Press
-    if (action === 1) {
-      if (key === 121) { // IK_F10
-        toggleAdminMenu();
-      } else if (key === 84) { // IK_T
-        if (!isAdminMenuActive) {
-          mp.cef.setFocus(true, true);
-          mp.events.emitCef('chat:open');
+
+// Stage 1: Resource Start
+mp.events.on('resourceStart', () => {
+  console.log('[G-CyberRPcore] resourceStart: Mounting Master CEF view...');
+  mp.cef.setUrl('./ui/index.html');
+  mp.cef.setFocus(true, true);
+});
+
+// Stage 2: onInit - Bind Keys (Safe for observers and native key input)
+if (mp.game && typeof mp.game.onInit === 'function') {
+  mp.game.onInit(() => {
+    console.log('[G-CyberRPcore] onInit: Engine initialized, binding keys...');
+    if (typeof mp.game.onInputKeyEvent === 'function') {
+      mp.game.onInputKeyEvent((action, key) => {
+        // action 1 = IACT_Press
+        if (action === 1) {
+          if (key === 121) { // IK_F10
+            toggleAdminMenu();
+          } else if (key === 84) { // IK_T
+            if (!isAdminMenuActive) {
+              mp.cef.setFocus(true, true);
+              mp.events.emitCef('chat:open');
+            }
+          } else if (key === 66) { // IK_B
+            handleSeatbelt();
+          }
         }
-      } else if (key === 66) { // IK_B
-        handleSeatbelt();
-      }
+      });
     }
   });
 }
 
-// Global Godmode Loop
-setInterval(() => {
-  if (isGodmodeActive) {
-    const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
-    if (localPlayer && localPlayer.health < 100) {
-      localPlayer.health = 100;
-    }
-  }
-}, 300);
+// Stage 3: onceGameLoaded - World Ready (Safe for spawnPlayer and world queries)
+if (mp.game && typeof mp.game.onceGameLoaded === 'function') {
+  mp.game.onceGameLoaded(() => {
+    console.log('[G-CyberRPcore] onceGameLoaded: World loaded, spawning player at Megabuilding H10...');
+    mp.local.spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+
+    // Mount Master UI & Show Loading/Multicharacter
+    mp.cef.setUrl('./ui/index.html');
+    mp.cef.setFocus(true, true);
+    mp.events.emitCef('g-cyber:ui:showLoading');
+  });
+}
 
 // =====================================================================
-// 5. CEF Lifecycle & Event Handlers
+// 4. CEF Lifecycle & Event Handlers
 // =====================================================================
-
-mp.events.on('resourceStart', () => {
-  console.log('[G-CyberRPcore] Resource started on client, ensuring CEF view...');
-  mp.cef.setUrl('./ui/index.html');
-  mp.cef.setFocus(true, true);
-});
 
 mp.events.onCef('domReady', (name) => {
   console.log('[G-CyberRPcore] CEF DOM ready:', name);
@@ -238,7 +215,7 @@ mp.events.onCef('chat:submit', (text) => {
     const cmd = parts[0].toLowerCase();
     const args = parts.slice(1);
 
-    if (cmd === 'admin' || cmd === 'adminmenu' || cmd === 'a') {
+    if (cmd === 'admin' || cmd === 'adminmenu' || cmd === 'a' || cmd === 'hub') {
       toggleAdminMenu();
     } else if (cmd === 'noclip') {
       toggleNoclip();
@@ -309,8 +286,17 @@ mp.events.onCef('g-cyber:admin:broadcast', (text) => {
 });
 
 // =====================================================================
-// 6. Server Event Receivers
+// 5. Server Event Receivers (F8 Console & Server Dispatches)
 // =====================================================================
+
+mp.events.onServer('g-cyber:client:toggleAdmin', () => toggleAdminMenu());
+mp.events.onServer('g-cyber:client:toggleNoclip', () => toggleNoclip());
+mp.events.onServer('g-cyber:client:toggleGod', () => toggleGodmode());
+mp.events.onServer('g-cyber:client:showCreator', () => handleSkin());
+mp.events.onServer('g-cyber:client:teleportCommand', (args) => handleTeleport(args));
+mp.events.onServer('g-cyber:client:respawn', () => {
+  mp.local.spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+});
 
 mp.events.onServer('g-cyber:client:startRoster', () => {
   mp.cef.setFocus(true, true);
