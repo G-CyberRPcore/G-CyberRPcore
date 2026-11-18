@@ -15,5 +15,5 @@ file = [
   "./assets/logo.jpg"
 ]
 
-use_game_natives = "true"
+use_game_natives = true
 hotreload = true

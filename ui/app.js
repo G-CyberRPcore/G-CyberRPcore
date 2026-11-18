@@ -356,8 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
           <div class="char-actions">
-            <button class="char-play-btn" data-char-id="${char.citizenid}">ENTER NIGHT CITY // دخول</button>
-            <button class="char-delete-btn" data-char-id="${char.citizenid}">DELETE IDENTITY // حذف</button>
+            <button class="char-play-btn" data-char-id="${char.citizenid}">ENTER NIGHT CITY // SPAWN</button>
+            <button class="char-delete-btn" data-char-id="${char.citizenid}">DELETE IDENTITY // PURGE</button>
           </div>
         `;
 
@@ -379,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
         card.innerHTML = `
           <div class="empty-icon">+</div>
           <div class="empty-title">SLOT ${slot} // NEW CITIZEN</div>
-          <p style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">انقر لإنشاء هوية جديدة ومظهر جديد</p>
+          <p style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">Click to establish a new citizen identity and customize appearance.</p>
         `;
         card.addEventListener('click', () => {
           openCharacterCreator(slot);

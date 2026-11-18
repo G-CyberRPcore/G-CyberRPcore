@@ -293,6 +293,32 @@ mp.events.onClient('g-cyber:admin:broadcast', (player, text) => {
   });
 });
 
+// Teleport to coordinates
+mp.events.onClient('g-cyber:admin:teleportCoords', (player, x, y, z) => {
+  if (player && typeof player.position !== 'undefined') {
+    player.position = [parseFloat(x), parseFloat(y), parseFloat(z)];
+    player.emit('g-cyber:client:notify', 'Teleport', `Teleported to [${x}, ${y}, ${z}]`, 'success');
+  }
+});
+
+// Player Lifecycle Hooks
+mp.events.on('playerConnecting', (tempId, name) => {
+  console.log(`[Connect] Incoming connection from ${name} (TempID: ${tempId})`);
+});
+
+mp.events.on('playerConnected', (playerId, tempId) => {
+  const player = mp.players.at(playerId);
+  if (!player) return;
+  console.log(`[G-CyberRPcore] Citizen ${player.nickname || 'Unknown'} (ID #${playerId}) connected.`);
+});
+
+mp.events.on('playerSpawn', (playerId) => {
+  const player = mp.players.at(playerId);
+  if (!player) return;
+  console.log(`[G-CyberRPcore] Citizen #${playerId} spawned in world.`);
+  player.emit('g-cyber:client:startRoster');
+});
+
 // Command: setadmin <id> on server console
 if (mp.commands) {
   mp.commands.add('setadmin', (player, args) => {

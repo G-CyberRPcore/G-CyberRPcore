@@ -1,97 +1,97 @@
-# G-CyberRPcore - Agent Memory & Context Guide (دليل المشروع والذاكرة)
+# G-CyberRPcore - Agent Memory & Architectural Guide
 
-> **Important**: هذا الملف مخصص لك كوكيل ذكاء اصطناعي (Agent) في أي محادثة جديدة لتتذكر فوراً كل ما تم إنجازه، البنية المعمارية الكاملة، ومسار العمل المستقبلي لمشروع **G-CyberRPcore**.
-
----
-
-## 🎯 1. الرؤية والهدف الأساسي (The Master Vision)
-
-- **اسم المشروع:** **`G-CyberRPcore`**
-- **الهدف:** بناء وتطوير المنظومة وإطار العمل القياسي الأول والأضخم عالمياً لطور الحياة الواقعية (Roleplay) على لعبة **Cyberpunk 2077** عبر منصة **CyberMP**.
-- **النموذج المرجعي:** محاكاة هندسة وفلسفة **QBCore** (المنظومة الأشهر في FiveM) وتطويعها لبيئة نايت سيتي وأكواد REDengine.
-- **المنظمة الرسمية على GitHub:** [https://github.com/G-CyberRPcore](https://github.com/G-CyberRPcore)
-  - مستودع بروفايل المنظمة: [`G-CyberRPcore/.github`](https://github.com/G-CyberRPcore/.github)
-  - مستودع النواة الأساسية: [`G-CyberRPcore/G-CyberRPcore`](https://github.com/G-CyberRPcore/G-CyberRPcore)
+> **Important**: This document serves as the persistent architectural reference and project memory for the AI Agent across all sessions. It documents the implemented systems, master framework structure, native CyberMP conventions, and roadmap for **`G-CyberRPcore`**.
 
 ---
 
-## 📁 2. المسارات المهمة على هذا الجهاز (Local File Paths)
+## 🎯 1. Vision & Master Architecture
 
-| المسار | الوصف |
+- **Project Name:** **`G-CyberRPcore`**
+- **Goal:** Develop the definitive, modular, enterprise-grade Roleplay Framework for **Cyberpunk 2077** running on the **CyberMP** multiplayer platform.
+- **Reference Standard:** Faithfully models the architectural patterns, paradigms, and functionality of **QBCore** (FiveM's leading framework), adapted natively for REDengine and Night City.
+- **Official GitHub Organization:** [https://github.com/G-CyberRPcore](https://github.com/G-CyberRPcore)
+  - Organization Profile: [`G-CyberRPcore/.github`](https://github.com/G-CyberRPcore/.github)
+  - Core Framework Repository: [`G-CyberRPcore/G-CyberRPcore`](https://github.com/G-CyberRPcore/G-CyberRPcore)
+
+---
+
+## 📁 2. Workspace & Environment Layout
+
+| Path | Purpose |
 | :--- | :--- |
-| `D:\cybermpserver` | خادم CyberMP المحلي التنفيذي (Port 2077 TCP/UDP، الإصدار v4.0.4-beta.1). |
-| `D:\G-CyberRPcore` | مستودع Git الأساسي لنواة المشروع المربوط مباشرة بـ GitHub. |
-| `E:\ProgramData\cybermp` | مشغل CyberMP Launcher للعبة العميل. |
-| `E:\SteamLibrary\steamapps\common\Cyberpunk 2077` | مجلد لعبة Cyberpunk 2077 الأصلي. |
-| `D:\G-CyberRPcore\assets\logo.svg` و `logo.jpg` | الشعار الرسمي ثلاثي الأبعاد وهوية G-CyberRPcore البصرية. |
-
-> [!WARNING]
-> **ملاحظة تقنية حرجة بخصوص مشغل CyberMP:**
-> ملف `E:\ProgramData\cybermp\resources\mp\prelauncher.exe` هو المسؤول عن مصافحة الاتصال. يقوم Windows Defender أحياناً بحجزه كاشتباه خاطئ (False Positive). تم استعادته ويجب التأكد دائماً من وجود استثناء (Exclusion) للمجلد `E:\ProgramData\cybermp` في Windows Defender.
+| `D:\cybermpserver` | Dedicated CyberMP runtime server (Port 2077 TCP/UDP, version v4.0.4-beta.1). |
+| `D:\G-CyberRPcore` | Primary Git source repository for the framework connected to GitHub. |
+| `E:\ProgramData\cybermp` | CyberMP Client Launcher installation. |
+| `E:\SteamLibrary\steamapps\common\Cyberpunk 2077` | Cyberpunk 2077 game directory. |
+| `D:\G-CyberRPcore\assets\logo.svg` & `logo.jpg` | Official 3D visual logo and brand assets for G-CyberRPcore. |
 
 ---
 
-## 🏛️ 3. البنية المعمارية للنواة (`G-CyberRPcore Architecture`)
+## 🏛️ 3. Core Architectural Subsystems
 
-النواة مبنية بنمط الكائن المشترك الموحد `global.G_CyberCore` ومكونة من:
+The framework operates under a unified global singleton: `global.G_CyberCore`.
 
-### أ. محرك النواة (`core/`):
-1. **`core/index.js`**: نقطة الدخول والمتحكم العام (Singleton) الذي يربط اللاعبين بالأحداث وقواعد البيانات.
-2. **`core/player.js`**: كائن اللاعب المتكامل `PlayerData`:
-   - `citizenid`: هوية المواطن الفريدة (مثل `NC-481924`).
-   - `charinfo`: الاسم الأول والأخير، تاريخ الميلاد، الجنس، والقصة.
-   - `money`: كاش (`cash`)، بنك (`bank`)، وعملات مشفرة (`crypto`).
-   - `job`: الوظيفة، الرتبة، الراتب، وحالة مباشرة العمل (`onDuty`).
-   - `gang`: العصابة (Valentinos, Maelstrom, etc.) ورتبتها.
-   - `metadata`: الجوع (`hunger`)، العطش (`thirst`)، الدرع (`armor`)، الإجهاد والتلوث السيبراني (`stress` / `cyberpsychosis`).
-   - `inventory`: مصفوفة العناصر وخانات الحقيبة (بحد أقصى للوزن 120 كجم).
-   - دوال فورية: `AddMoney`, `RemoveMoney`, `SetJob`, `SetJobDuty`, `AddItem`, `RemoveItem`, `SetMetaData`, `SyncHUD`.
-3. **`core/callbacks.js`**: نظام استدعاءات الخادم والعميل غير المتزامنة (`CreateCallback` / `TriggerCallback`).
-4. **`core/commands.js`**: تسجيل الأوامر مع فحص الصلاحيات الشجرية (`admin`, `mod`, `user`).
-5. **`core/database.js`**: محرك قاعدة البيانات التخزيني التلقائي.
+### A. Core Engine (`core/`):
+1. **`core/index.js`**: Primary entry point and singleton controller tying players, events, and persistent storage together.
+2. **`core/player.js`**: Comprehensive `PlayerData` structure:
+   - `citizenid`: Unique citizen identifier (e.g. `NC-481924`).
+   - `charinfo`: First and last name, birthdate, gender, backstory.
+   - `money`: Wallets for `cash`, `bank`, and `crypto`.
+   - `job`: Career, grade, salary, on-duty state (`onDuty`).
+   - `gang`: Affiliation (Valentinos, Maelstrom, Tyger Claws, The Mox) and gang rank.
+   - `metadata`: `hunger`, `thirst`, `armor`, `stress`, and `cyberpsychosis` load.
+   - `inventory`: Weight-based inventory array (120 kg max capacity).
+   - Functions: `AddMoney`, `RemoveMoney`, `SetJob`, `SetJobDuty`, `AddItem`, `RemoveItem`, `SetMetaData`, `SyncHUD`.
+3. **`core/callbacks.js`**: Asynchronous server-client RPC engine (`CreateCallback` / `TriggerCallback`).
+4. **`core/commands.js`**: Permission-based command router (`admin`, `mod`, `user`).
 
-### ب. السجلات المشتركة العملاقة (`shared/`):
-* **`shared/items.js`**: أكثر من 150 عنصراً لـ Cyberpunk (MaxDoc, Bounce Back, Cyberdecks, Sandevistan, Kiroshi Optics, الأسلحة والذخائر، والأطعمة والمشروبات).
-* **`shared/jobs.js`**: وظائف بالرتب والرواتب (NCPD, Trauma Team, Ripperdoc, Mechanics, Delamain, Fixers, Arasaka).
-* **`shared/gangs.js`**: عصابات Night City ومناطق نفوذها.
-* **`shared/vehicles.js`**: أكثر من 80 مركبة بأكواد TweakDB IDs ومظاهر CName وسعات الصناديق.
+### B. Master Unified CEF Layer (`ui/`):
+CyberMP maintains a single active CEF browser instance. All visual layers are composed into a unified Single Page Application (SPA):
+1. **`#view-loading`**:
+   - Web Audio API equalizer visualizer connected to the official soundtrack `G-CyberRPcore-Loading.mp3`.
+   - 5 interactive tabs: Overview, Directives (Server Rules), Neural Keybinds, System Changelog, Network & Community.
+   - Status ticker, progress bar, and "JACK IN // ENTER NIGHT CITY" action trigger.
+2. **`#view-multicharacter`**:
+   - 4-slot citizen roster grid with live metadata (Name, CitizenID, Job, Bank, Cash, Life Path badge).
+   - Identity selection and delete confirmation dialogs.
+3. **`#view-creator`**:
+   - 4-stage wizard: Identity & Life Path, Facial Structure & Genetics, Cyberware Implants, Apparel & Outfits.
+   - Real-time holographic character card preview.
+4. **`#view-hud`**:
+   - Hexagonal status dials: Health, Armor, Stamina, Cyberware Strain.
+   - Cash and bank balance displays, career badge, proximity voice indicator.
+   - Realistic vehicle telemetry HUD: Speedometer, dynamic RPM, gear indicator, functional seatbelt.
+5. **`#view-chat`**:
+   - Spatial proximity chat (15-meter radius).
+   - Roleplay commands: `/me`, `/do`, `/ooc`, `/shout`, `/whisper`, `/tweet`, `/dispatch`.
+6. **`#view-admin`**:
+   - Player management: Teleport to, Bring, Freeze, Revive, Heal, Give Money, Set Job, Kick.
+   - Self privileges: Godmode invincibility, Noclip free-flight, Invisibility, Infinite Stamina.
+   - Quick district teleports: Corpo Plaza, Megabuilding H10, Afterlife, Pacifica Pier, Santo Domingo, Badlands Camp, Arasaka Tower Roof.
+   - Vehicle spawner and utilities: Quadra Turbo-R, Rayfield Caliburn, Arch Nazaré, NCPD Cruiser, Trauma Team Ambulance.
+   - Environment controls: Weather and time manipulation, holographic announcements.
+   - Developer tools: Real-time Vector4 coordinates with one-click clipboard copy.
 
 ---
 
-## 🧩 4. حالة الموديولات البرمجية (Modules Status)
+## ⚡ 4. Native CyberMP Engine Protocols & Conventions
 
-| الموديول | الحالة | الوصف |
-| :--- | :--- | :--- |
-| **`g-cyber-loading`** | ✅ مكتمل ومثبت ومرفوع | شاشة تحميل سينمائية متطورة مستوحاة من qb-loading مع مشغل ومحلل موجات صوتي حي (Web Audio API Equalizer) لموسيقى `G-CyberRPcore-Loading.mp3`، شبكة سايبربانك ثلاثية الأبعاد متحركة، 5 تبويبات تفاعلية (نبذة عن السيرفر، القوانين الصارمة، أزرار التحكم، سجل التحديثات، وروابط المجتمع)، شريط تقدم دقيق، وزر الانتقال الفوري [JACK IN]. |
-| **`g-cyber-multicharacter`** | ✅ مكتمل ومثبت ومرفوع | نظام تعدد الشخصيات مستوحى من qb-multicharacter مع 4 خانات للمواطنين، بطاقات هولوتك تعرض الاسم والهوية ومسار الحياة والوظيفة والأموال، مع إمكانية حذف أو اختيار الشخصية. |
-| **`g-cyber-clothing`** | ✅ مكتمل ومثبت ومرفوع | محرر مظهر وهوية متكامل مستوحى من qb-clothing يتضمن: الاسم وتاريخ الميلاد ومسارات الحياة الثلاثة (Streetkid / Nomad / Corpo)، اختيار قوالب V، ألوان البشرة والأعين النيونية، 20+ قصة شعر، الزرع السيبراني في الوجه، وأزياء السايبربانك الرسمية والشوارع. |
-| **`g-cyber-adminmenu`** | ✅ مكتمل ومثبت ومرفوع | لوحة تحكم ومراقبة عملاقة للمسؤولين مستوحاة من qb-adminmenu (تفتح بـ F10 أو /admin): إدارة اللاعبين (انتقال، جلب، تجميد، إنعاش، علاج، أموال، وظائف، طرد)، خيارات المسؤول (Godmode، Noclip، تخفي، تنقل سريع لأحياء المدينة)، رسبون وتصليح وحذف المركبات، التحكم بالطقس والوقت، إذاعة الأخبار، ونسخ الإحداثيات المباشرة. |
-| **`g-cyber-hud`** | ✅ مكتمل ومثبت ومرفوع | HUD عصري بأسلوب Cyberpunk 2077 يتضمن دوال الحالة الدائرية، مؤشر صوت حي بموجات متحركة (Waveform)، عداد سرعة هولوغرافي للمركبات مع شريط RPM ومؤشر غيارات وحزام أمان، قائمة إعدادات `/hudmenu`، طور سينمائي `/cinematic`، وأصوات نيونية عبر Web Audio API. |
-| **`chat`** | ✅ مكتمل ومثبت | نظام الشات المحاكي للواقع مع المحادثة المكانية (15م) وأوامر `/me`, `/do`, `/ooc`, `/shout`, `/whisper`, `/tweet`, `/dispatch`. |
-| **`g-cyber-inventory`** | ⏳ الموديول القادم | حقيبة بالشبكة والمربعات (Grid Inventory) مع السحب والإفلات (Drag & Drop)، وأوزان الأسلحة وخانات السايبروير وأزرار الوصول السريع 1-5. |
-| **`g-cyber-banking`** | ⏳ قادم | نظام بنوك وصرافات آلية متطور مع بطاقات ائتمان وحسابات مشتركة للشركات. |
-| **`g-cyber-garages`** | ⏳ قادم | كراجات تفاعلية ومفاتيح أمان `/lock` مع حجز المركبات وتعديلها. |
-| **`g-cyber-housing`** | ⏳ قادم | شقق بالأبعاد الافتراضية وخزائن خاصة ودعوات زوار. |
-| **`g-cyber-police` / `trauma`**| ⏳ قادم | غرف عمليات MDT للشرطة ودفتر مخالفات وكلبشات، وإنعاش طبي ميداني للإسعاف. |
-
----
-
-## ⚙️ 5. قواعد وتعليمات تقنية للتطوير (Developer Guidelines)
-
-1. **التعامل مع بيئة CyberMP Executable:**
-   - السيرفر يعمل بنواة Node.js v22 مدمجة عبر `libnode.dll`.
-   - في ملفات البداية (`server.js` الرئيسية للمورد)، احرص دائماً على فحص تصدير الموديل:
-     ```javascript
-     if (typeof module !== 'undefined') { module.exports = G_CyberCore; }
-     ```
-     واعتمد دائماً على الكائن العام `global.G_CyberCore`.
-2. **المزامنة مع GitHub:**
-   - عند إجراء أي تعديل أو إضافة موديول جديد في `D:\G-CyberRPcore`، قم بالدفع فوراً للمستودع عبر:
-     ```bash
-     git add .
-     git commit -m "feat: ..."
-     git push origin main
-     ```
-3. **تطبيق التعديلات على السيرفر التنفيذي:**
-   - انسخ دائماً الموديول الجديد إلى `D:\cybermpserver\resources\` وأضفه إلى قائمة `resources` في `D:\cybermpserver\server.toml`.
-   - يمكن تشغيل السيرفر واختباره عبر ملف [`start-server.bat`](file:///D:/cybermpserver/start-server.bat).
+- **CEF URL Configuration:**
+  Configured in `resource.toml` as `cef_url = "./ui/index.html"` and mounted via `mp.cef.setUrl('./ui/index.html')`.
+- **Engine Key Handling:**
+  In CyberMP, native key detection uses:
+  ```javascript
+  mp.game.onInputKeyEvent((action, key) => {
+    // action: 1 = IACT_Press
+    // key: 121 = IK_F10 (Admin Menu)
+    // key: 84  = IK_T   (Chat Input)
+    // key: 66  = IK_B   (Seatbelt Toggle)
+  });
+  ```
+- **Client Commands Callback Signature:**
+  `mp.commands.add(commandName, (id: number, args: string[]) => void)`
+  *(The first parameter is always the caller ID; arguments array is the second parameter).*
+- **Process & Port Rules:**
+  Port 2077 must remain unblocked. Before starting the server, verify no background instances hold the port to prevent `EADDRINUSE`.
+- **Language Mandate:**
+  All scripts, UI HTML, CSS, JavaScript, and user-facing notices MUST remain 100% in English. Localization systems will hook in dynamically based on client settings.

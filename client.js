@@ -1,9 +1,9 @@
 // G-CyberRPcore - Master Client Controller
-// Manages CEF Master UI, Noclip flight, Godmode, Client Commands, and Network Bridge
+// Manages CEF Master UI, Engine Input (F10, T, B), Commands, Noclip, Godmode, and Server Bridge
 
 console.log('[G-CyberRPcore] Master Client Subsystem Initializing...');
 
-// 1. Mount Master CEF Webview
+// 1. Initial Mount for Master CEF Webview
 mp.cef.setUrl('./ui/index.html');
 mp.cef.setFocus(true, true);
 
@@ -12,7 +12,7 @@ let isGodmodeActive = false;
 let isSeatbeltActive = false;
 let isAdminMenuActive = false;
 
-// Coordinate Teleport Presets
+// Coordinate Presets for Quick Teleport
 const DISTRICT_COORDS = {
   corpo_plaza: [-210.0, -580.0, 42.0],
   megabuilding_h10: [-1392.6, 1271.5, 123.0],
@@ -24,169 +24,165 @@ const DISTRICT_COORDS = {
 };
 
 // =====================================================================
-// 2. Client Command Registry (F8 Console & Native Dispatcher)
+// 2. Core Navigation & Toggle Functions
 // =====================================================================
 
-// /admin or admin in F8 console
-mp.commands.add('admin', () => {
-  toggleAdminMenu();
-});
-mp.commands.add('adminmenu', () => {
-  toggleAdminMenu();
-});
-mp.commands.add('a', () => {
-  toggleAdminMenu();
-});
+function toggleAdminMenu(forceState) {
+  isAdminMenuActive = (forceState !== undefined) ? forceState : !isAdminMenuActive;
+  mp.cef.setFocus(isAdminMenuActive, isAdminMenuActive);
+  mp.events.emitCef('g-cyber:ui:toggleAdmin', isAdminMenuActive);
+  console.log(`[G-CyberRPcore] Admin Menu toggled: ${isAdminMenuActive}`);
+}
 
-// /noclip in F8 console
-mp.commands.add('noclip', () => {
-  toggleNoclip();
-});
+function toggleNoclip() {
+  isNoclipActive = !isNoclipActive;
+  const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
+  if (localPlayer && typeof localPlayer.setCollision === 'function') {
+    localPlayer.setCollision(!isNoclipActive);
+  }
+  mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/Shift.' : 'Disabled.', 'info');
+  console.log(`[G-CyberRPcore] Noclip toggled: ${isNoclipActive}`);
+}
 
-// /god in F8 console
-mp.commands.add('god', () => {
+function toggleGodmode() {
   isGodmodeActive = !isGodmodeActive;
   mp.events.emitCef('g-cyber:hud:notify', 'Godmode', isGodmodeActive ? 'Invincibility enabled.' : 'Invincibility disabled.', 'info');
-  console.log(`[Admin] Godmode toggled: ${isGodmodeActive}`);
-});
+  console.log(`[G-CyberRPcore] Godmode toggled: ${isGodmodeActive}`);
+}
 
-// /tp <x> <y> <z> or /tp <district>
-mp.commands.add('tp', (args) => {
-  const localPlayer = mp.players.local;
-  if (!localPlayer) return;
+function handleSeatbelt() {
+  isSeatbeltActive = !isSeatbeltActive;
+  mp.events.emitCef('g-cyber:hud:notify', 'Seatbelt', isSeatbeltActive ? 'Buckled.' : 'Unbuckled!', isSeatbeltActive ? 'success' : 'warning');
+}
 
+function handleTeleport(args) {
   if (args && args.length === 1 && DISTRICT_COORDS[args[0].toLowerCase()]) {
     const coords = DISTRICT_COORDS[args[0].toLowerCase()];
-    localPlayer.position = coords;
-    mp.events.emitCef('g-cyber:hud:notify', 'Teleport', `Teleported to ${args[0]}`, 'success');
+    mp.events.emitServer('g-cyber:admin:teleportCoords', coords[0], coords[1], coords[2]);
+    mp.events.emitCef('g-cyber:hud:notify', 'Teleport', `Teleporting to ${args[0]}`, 'success');
   } else if (args && args.length >= 3) {
     const x = parseFloat(args[0]);
     const y = parseFloat(args[1]);
     const z = parseFloat(args[2]);
     if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-      localPlayer.position = [x, y, z];
+      mp.events.emitServer('g-cyber:admin:teleportCoords', x, y, z);
       mp.events.emitCef('g-cyber:hud:notify', 'Teleport', `Relocated to [${x}, ${y}, ${z}]`, 'success');
     }
   } else {
     console.log('Usage: tp <x> <y> <z> OR tp <corpo_plaza|megabuilding_h10|afterlife|pacifica_pier|santo_domingo|badlands_camp|arasaka_roof>');
   }
-});
+}
 
-// /car <model> or /veh <model>
-mp.commands.add('car', (args) => {
+function handleSpawnVehicle(args) {
   const model = (args && args.length > 0) ? args[0] : 'QuadraTurboR';
   mp.events.emitServer('g-cyber:admin:spawnVehicle', model);
-});
-mp.commands.add('veh', (args) => {
-  const model = (args && args.length > 0) ? args[0] : 'QuadraTurboR';
-  mp.events.emitServer('g-cyber:admin:spawnVehicle', model);
-});
+}
 
-// /revive [id]
-mp.commands.add('revive', (args) => {
+function handleRevive(args) {
   const targetId = (args && args.length > 0) ? parseInt(args[0]) : 0;
   mp.events.emitServer('g-cyber:admin:playerAction', 'revive', targetId);
-});
+}
 
-// /heal [id]
-mp.commands.add('heal', (args) => {
+function handleHeal(args) {
   const targetId = (args && args.length > 0) ? parseInt(args[0]) : 0;
   mp.events.emitServer('g-cyber:admin:playerAction', 'heal', targetId);
-});
+}
 
-// /givemoney <id> <type> <amount>
-mp.commands.add('givemoney', (args) => {
+function handleGiveMoney(args) {
   if (args && args.length >= 3) {
     mp.events.emitServer('g-cyber:admin:giveMoneyCommand', parseInt(args[0]), args[1], parseInt(args[2]));
   } else {
     console.log('Usage: givemoney <id> <cash|bank|crypto> <amount>');
   }
-});
+}
 
-// /setjob <id> <job> <grade>
-mp.commands.add('setjob', (args) => {
+function handleSetJob(args) {
   if (args && args.length >= 2) {
     mp.events.emitServer('g-cyber:admin:setJobCommand', parseInt(args[0]), args[1], parseInt(args[2] || 0));
   } else {
     console.log('Usage: setjob <id> <ncpd|trauma|ripperdoc|civilian> <grade>');
   }
-});
+}
 
-// /weather <type>
-mp.commands.add('weather', (args) => {
+function handleWeather(args) {
   if (args && args.length > 0) {
     mp.events.emitServer('g-cyber:admin:setWeather', args[0]);
   }
-});
+}
 
-// /time <hour>
-mp.commands.add('time', (args) => {
+function handleTime(args) {
   if (args && args.length > 0) {
     mp.events.emitServer('g-cyber:admin:setTime', parseInt(args[0]));
   }
-});
+}
 
-// /char or /multichar
-mp.commands.add('char', () => {
+function handleChar() {
   mp.cef.setFocus(true, true);
   mp.events.emitServer('g-cyber:server:requestCharacters');
-});
-mp.commands.add('multichar', () => {
-  mp.cef.setFocus(true, true);
-  mp.events.emitServer('g-cyber:server:requestCharacters');
-});
+}
 
-// /skin or /clothing
-mp.commands.add('skin', () => {
+function handleSkin() {
   mp.cef.setFocus(true, true);
   mp.events.emitCef('g-cyber:ui:showCreator', 1);
-});
-mp.commands.add('clothing', () => {
-  mp.cef.setFocus(true, true);
-  mp.events.emitCef('g-cyber:ui:showCreator', 1);
-});
+}
 
-// /seatbelt
-mp.commands.add('seatbelt', () => {
-  isSeatbeltActive = !isSeatbeltActive;
-  mp.events.emitCef('g-cyber:hud:notify', 'Seatbelt', isSeatbeltActive ? 'Buckled.' : 'Unbuckled!', isSeatbeltActive ? 'success' : 'warning');
-});
+// =====================================================================
+// 3. Client Command Dispatcher (F8 Console: id, args)
+// =====================================================================
 
-// /ping
-mp.commands.add('ping', () => {
+mp.commands.add('admin', (id, args) => toggleAdminMenu());
+mp.commands.add('adminmenu', (id, args) => toggleAdminMenu());
+mp.commands.add('a', (id, args) => toggleAdminMenu());
+mp.commands.add('noclip', (id, args) => toggleNoclip());
+mp.commands.add('god', (id, args) => toggleGodmode());
+mp.commands.add('tp', (id, args) => handleTeleport(args));
+mp.commands.add('car', (id, args) => handleSpawnVehicle(args));
+mp.commands.add('veh', (id, args) => handleSpawnVehicle(args));
+mp.commands.add('revive', (id, args) => handleRevive(args));
+mp.commands.add('heal', (id, args) => handleHeal(args));
+mp.commands.add('givemoney', (id, args) => handleGiveMoney(args));
+mp.commands.add('setjob', (id, args) => handleSetJob(args));
+mp.commands.add('weather', (id, args) => handleWeather(args));
+mp.commands.add('time', (id, args) => handleTime(args));
+mp.commands.add('char', (id, args) => handleChar());
+mp.commands.add('multichar', (id, args) => handleChar());
+mp.commands.add('skin', (id, args) => handleSkin());
+mp.commands.add('clothing', (id, args) => handleSkin());
+mp.commands.add('seatbelt', (id, args) => handleSeatbelt());
+mp.commands.add('ping', (id, args) => {
   console.log('[CyberMP] Server ping: 12ms (Optimal)');
   mp.events.emitCef('g-cyber:hud:notify', 'Network Ping', '12ms (Direct connection)', 'info');
 });
-
-// /loading
-mp.commands.add('loading', () => {
+mp.commands.add('loading', (id, args) => {
   mp.cef.setFocus(true, true);
   mp.events.emitCef('g-cyber:ui:showLoading');
 });
 
 // =====================================================================
-// 3. Admin Menu & Noclip Controllers
+// 4. Native Engine Key Input Listener (F10, T, B)
 // =====================================================================
-function toggleAdminMenu() {
-  isAdminMenuActive = !isAdminMenuActive;
-  mp.cef.setFocus(isAdminMenuActive, isAdminMenuActive);
-  mp.events.emitCef('g-cyber:ui:toggleAdmin', isAdminMenuActive);
-}
-
-function toggleNoclip() {
-  isNoclipActive = !isNoclipActive;
-  const localPlayer = mp.players.local;
-  if (localPlayer && typeof localPlayer.setCollision === 'function') {
-    localPlayer.setCollision(!isNoclipActive);
-  }
-  mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/Shift.' : 'Disabled.', 'info');
-  console.log(`[Admin] Noclip toggled: ${isNoclipActive}`);
+if (mp.game && typeof mp.game.onInputKeyEvent === 'function') {
+  mp.game.onInputKeyEvent((action, key) => {
+    // action: 1 = IACT_Press
+    if (action === 1) {
+      if (key === 121) { // IK_F10
+        toggleAdminMenu();
+      } else if (key === 84) { // IK_T
+        if (!isAdminMenuActive) {
+          mp.cef.setFocus(true, true);
+          mp.events.emitCef('chat:open');
+        }
+      } else if (key === 66) { // IK_B
+        handleSeatbelt();
+      }
+    }
+  });
 }
 
 // Global Godmode Loop
 setInterval(() => {
   if (isGodmodeActive) {
-    const localPlayer = mp.players.local;
+    const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
     if (localPlayer && localPlayer.health < 100) {
       localPlayer.health = 100;
     }
@@ -194,12 +190,23 @@ setInterval(() => {
 }, 300);
 
 // =====================================================================
-// 4. CEF Event Handlers & Forwarders
+// 5. CEF Lifecycle & Event Handlers
 // =====================================================================
+
+mp.events.on('resourceStart', () => {
+  console.log('[G-CyberRPcore] Resource started on client, ensuring CEF view...');
+  mp.cef.setUrl('./ui/index.html');
+  mp.cef.setFocus(true, true);
+});
+
+mp.events.onCef('domReady', (name) => {
+  console.log('[G-CyberRPcore] CEF DOM ready:', name);
+  mp.events.emitCef('g-cyber:ui:showLoading');
+});
+
 mp.events.onCef('g-cyber:loading:finish', () => {
-  mp.cef.setFocus(false, false);
-  mp.events.emitServer('g-cyber:loading:playerReady');
-  console.log('[G-CyberRPcore] Loading screen finished.');
+  console.log('[G-CyberRPcore] Loading screen finished, requesting character roster...');
+  mp.events.emitServer('g-cyber:server:requestCharacters');
 });
 
 mp.events.onCef('g-cyber:characters:request', () => {
@@ -236,11 +243,11 @@ mp.events.onCef('chat:submit', (text) => {
     } else if (cmd === 'noclip') {
       toggleNoclip();
     } else if (cmd === 'god') {
-      isGodmodeActive = !isGodmodeActive;
-      mp.events.emitCef('g-cyber:hud:notify', 'Godmode', isGodmodeActive ? 'Enabled' : 'Disabled', 'info');
+      toggleGodmode();
     } else if (cmd === 'clothing' || cmd === 'skin') {
-      mp.cef.setFocus(true, true);
-      mp.events.emitCef('g-cyber:ui:showCreator', 1);
+      handleSkin();
+    } else if (cmd === 'char' || cmd === 'multichar') {
+      handleChar();
     } else {
       mp.events.emitServer('chat:command', cmd, args);
     }
@@ -268,16 +275,15 @@ mp.events.onCef('g-cyber:admin:toggleSelf', (feature, state) => {
 });
 
 mp.events.onCef('g-cyber:admin:selfAction', (action) => {
-  const localPlayer = mp.players.local;
-  if (!localPlayer) return;
-  if (action === 'heal') localPlayer.health = 100;
+  const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
+  if (localPlayer && action === 'heal') localPlayer.health = 100;
   mp.events.emitServer('g-cyber:server:adminSelfAction', action);
 });
 
 mp.events.onCef('g-cyber:admin:teleportDistrict', (district) => {
-  const localPlayer = mp.players.local;
-  if (localPlayer && DISTRICT_COORDS[district]) {
-    localPlayer.position = DISTRICT_COORDS[district];
+  if (DISTRICT_COORDS[district]) {
+    const coords = DISTRICT_COORDS[district];
+    mp.events.emitServer('g-cyber:admin:teleportCoords', coords[0], coords[1], coords[2]);
     mp.events.emitCef('g-cyber:hud:notify', 'Teleport', `Arrived in ${district.replace('_', ' ').toUpperCase()}`, 'success');
   }
 });
@@ -303,9 +309,16 @@ mp.events.onCef('g-cyber:admin:broadcast', (text) => {
 });
 
 // =====================================================================
-// 5. Server Event Receivers
+// 6. Server Event Receivers
 // =====================================================================
+
+mp.events.onServer('g-cyber:client:startRoster', () => {
+  mp.cef.setFocus(true, true);
+  mp.events.emitServer('g-cyber:server:requestCharacters');
+});
+
 mp.events.onServer('g-cyber:client:receiveCharacters', (charsJson) => {
+  mp.cef.setFocus(true, true);
   mp.events.emitCef('g-cyber:ui:showMulticharacter', charsJson);
 });
 
@@ -331,7 +344,7 @@ mp.events.onServer('chat:add', (text, type) => {
 
 // Telemetry & Speedometer Sync Loop (100ms)
 setInterval(() => {
-  const localPlayer = mp.players.local;
+  const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
   if (!localPlayer) return;
 
   // Send Coordinates to Admin Menu
