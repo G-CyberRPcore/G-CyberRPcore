@@ -310,13 +310,30 @@ mp.events.on('playerConnected', (playerId, tempId) => {
   const player = mp.players.at(playerId);
   if (!player) return;
   console.log(`[G-CyberRPcore] Citizen ${player.nickname || 'Unknown'} (ID #${playerId}) connected.`);
+  if (mp.events && typeof mp.events.emitClient === 'function') {
+    mp.events.emitClient(playerId, 'chat:add', '[G-CyberRPcore] Welcome to Night City. Type /help or press F10 for Admin Menu.', 'system');
+  }
 });
 
 mp.events.on('playerSpawn', (playerId) => {
   const player = mp.players.at(playerId);
-  if (!player) return;
   console.log(`[G-CyberRPcore] Citizen #${playerId} spawned in world.`);
-  player.emit('g-cyber:client:startRoster');
+  if (player && typeof player.emit === 'function') {
+    player.emit('g-cyber:client:startRoster');
+  }
+  if (mp.events && typeof mp.events.emitClient === 'function') {
+    mp.events.emitClient(playerId, 'g-cyber:client:startRoster');
+  }
+});
+
+// Lua bridge for admin menu toggle
+mp.events.onClient('g-cyber:admin:toggleAdminMenu', (player) => {
+  if (player) {
+    if (typeof player.emit === 'function') player.emit('g-cyber:client:toggleAdmin');
+    if (mp.events && typeof mp.events.emitClient === 'function') {
+      mp.events.emitClient(player.id, 'g-cyber:client:toggleAdmin');
+    }
+  }
 });
 
 // =====================================================================
@@ -326,19 +343,37 @@ if (mp.commands) {
   // Command: admin / adminmenu / a / hub
   mp.commands.add('admin', (player, args) => {
     if (player) {
-      player.emit('g-cyber:client:toggleAdmin');
+      if (typeof player.emit === 'function') player.emit('g-cyber:client:toggleAdmin');
+      if (mp.events && typeof mp.events.emitClient === 'function') {
+        mp.events.emitClient(player.id, 'g-cyber:client:toggleAdmin');
+      }
     } else {
       console.log('[Admin] Admin command is for in-game players.');
     }
   });
   mp.commands.add('adminmenu', (player, args) => {
-    if (player) player.emit('g-cyber:client:toggleAdmin');
+    if (player) {
+      if (typeof player.emit === 'function') player.emit('g-cyber:client:toggleAdmin');
+      if (mp.events && typeof mp.events.emitClient === 'function') {
+        mp.events.emitClient(player.id, 'g-cyber:client:toggleAdmin');
+      }
+    }
   });
   mp.commands.add('a', (player, args) => {
-    if (player) player.emit('g-cyber:client:toggleAdmin');
+    if (player) {
+      if (typeof player.emit === 'function') player.emit('g-cyber:client:toggleAdmin');
+      if (mp.events && typeof mp.events.emitClient === 'function') {
+        mp.events.emitClient(player.id, 'g-cyber:client:toggleAdmin');
+      }
+    }
   });
   mp.commands.add('hub', (player, args) => {
-    if (player) player.emit('g-cyber:client:toggleAdmin');
+    if (player) {
+      if (typeof player.emit === 'function') player.emit('g-cyber:client:toggleAdmin');
+      if (mp.events && typeof mp.events.emitClient === 'function') {
+        mp.events.emitClient(player.id, 'g-cyber:client:toggleAdmin');
+      }
+    }
   });
 
   // Command: noclip

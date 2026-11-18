@@ -76,8 +76,28 @@ CyberMP maintains a single active CEF browser instance. All visual layers are co
 
 ## ⚡ 4. Native CyberMP Engine Protocols & Conventions
 
-- **CEF URL Configuration:**
-  Configured in `resource.toml` as `cef_url = "./ui/index.html"` and mounted via `mp.cef.setUrl('./ui/index.html')`.
+- **Dual Client Architecture (`client.js` + `client.lua`):**
+  - Configured in `resource.toml`:
+    ```toml
+    client_script = [
+      "./client.js",
+      "./client.lua"
+    ]
+    ```
+  - `client.lua` executes synchronously inside REDengine via Cyber Engine Tweaks / LuaVM, safely handling native health pools, `onGameLoaded` lifecycle events, and `mp.client.spawnPlayer`.
+  - `client.js` runs in V8, managing the Chromium Embedded Framework (CEF), RPC server communication, HUD telemetry, and UI keybinds.
+
+- **REDengine Pre-Spawn Health Pool Protocol:**
+  Before invoking `spawnPlayer`, health stat pools must be initialized to avoid immediate flatlining:
+  - `Health Stat Pool Type: 17`
+  - `Health Stat Type: 787`
+  - `Additive Modifier Type: 0`
+  - Lua implementation: `statPoolsSystem:RequestSettingStatPoolValueIgnoreChangeMode(playerGameId, 17, 300, nil, false)`
+
+- **CEF URL & Input Focus Protocol:**
+  - Configured in `resource.toml` as `cef_url = "./ui/index.html"`.
+  - Never call `mp.cef.setFocus(true, true)` prematurely inside `resourceStart`. Only acquire focus when interactive UI is active.
+
 - **Engine Key Handling:**
   In CyberMP, native key detection uses:
   ```javascript
@@ -88,10 +108,16 @@ CyberMP maintains a single active CEF browser instance. All visual layers are co
     // key: 66  = IK_B   (Seatbelt Toggle)
   });
   ```
+
 - **Client Commands Callback Signature:**
   `mp.commands.add(commandName, (id: number, args: string[]) => void)`
   *(The first parameter is always the caller ID; arguments array is the second parameter).*
+
+- **Cache & Compilation Rules:**
+  - Server caches compiled resources in `D:\cybermpserver\cache\G-CyberRPcore\resource.archive`. Whenever client scripts or UI assets are modified, delete `D:\cybermpserver\cache\G-CyberRPcore\*` and client cache `E:\ProgramData\cybermp\resources\mp\cache\client_resources\*` so the server compiles and streams fresh resource archives.
+
 - **Process & Port Rules:**
   Port 2077 must remain unblocked. Before starting the server, verify no background instances hold the port to prevent `EADDRINUSE`.
+
 - **Language Mandate:**
   All scripts, UI HTML, CSS, JavaScript, and user-facing notices MUST remain 100% in English. Localization systems will hook in dynamically based on client settings.
