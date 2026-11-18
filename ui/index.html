@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G-CyberRPcore Master Ecosystem</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,700&family=Rajdhani:wght@500;600;700&family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Ambient Audio Element -->
+  <audio id="bg-audio" src="audio/G-CyberRPcore-Loading.mp3" preload="auto" loop></audio>
+
+  <!-- Background Animated Cyber-Grid Canvas & Overlays -->
+  <canvas id="cyber-canvas"></canvas>
+  <div class="vignette-overlay"></div>
+  <div class="scanlines"></div>
+
+  <!-- Notification & Toast Stream -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Server Announcement Hologram Banner -->
+  <div id="server-announcement-banner" class="announcement-banner">
+    <div class="announcement-bracket">[SYSTEM BROADCAST]</div>
+    <div class="announcement-text" id="announcement-text">Night City server broadcast message</div>
+  </div>
+
+  <!-- =====================================================================
+       LAYER 1: LOADING SCREEN (qb-loading style)
+       ===================================================================== -->
+  <div id="view-loading" class="master-layer active">
+    <!-- Top Bar: Branding, Telemetry, Audio Deck -->
+    <header class="loading-top-bar">
+      <div class="brand-container">
+        <div class="logo-box">
+          <img src="assets/logo.svg" alt="G-CyberRPcore Logo" class="brand-logo" onerror="this.src='assets/logo.jpg'">
+          <div class="logo-glow"></div>
+        </div>
+        <div class="brand-text">
+          <div class="core-tag">NEURAL LINK // RE-V8</div>
+          <h1 class="brand-title">G-CYBER<span class="highlight">RP</span>CORE</h1>
+          <div class="brand-subtitle">NIGHT CITY ROLEPLAY ECOSYSTEM</div>
+        </div>
+      </div>
+
+      <div class="telemetry-deck">
+        <div class="tele-item">
+          <span class="tele-label">HOST</span>
+          <span class="tele-val text-cyan">127.0.0.1:2077</span>
+        </div>
+        <div class="tele-item">
+          <span class="tele-label">SERVER TICK</span>
+          <span class="tele-val text-yellow">60 HZ</span>
+        </div>
+        <div class="tele-item">
+          <span class="tele-label">LATENCY</span>
+          <span class="tele-val text-green" id="tele-ping">12 MS</span>
+        </div>
+        <div class="tele-item">
+          <span class="tele-label">SECURITY</span>
+          <span class="tele-val text-pink">VERIFIED</span>
+        </div>
+      </div>
+
+      <!-- High-Tech Audio Deck with Real-Time Equalizer -->
+      <div class="audio-deck">
+        <div class="audio-info">
+          <span class="audio-tag">AUDIO STREAM // ACTIVE</span>
+          <span class="audio-title">G-CyberRPcore Main Theme</span>
+        </div>
+        <div class="visualizer" id="visualizer">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+        <div class="audio-controls">
+          <button class="audio-btn" id="btn-play-pause" title="Play/Pause [Space]">
+            <span id="play-icon">⏸</span>
+          </button>
+          <button class="audio-btn" id="btn-mute" title="Mute [M]">
+            <span id="mute-icon">🔊</span>
+          </button>
+          <div class="volume-slider-box">
+            <input type="range" id="volume-slider" min="0" max="100" value="45" title="Volume">
+            <span class="vol-label" id="vol-percent">45%</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Center Content Hub -->
+    <main class="loading-content-hub">
+      <nav class="tab-strip">
+        <button class="tab-btn active" data-tab="tab-overview">
+          <span class="tab-num">01</span>
+          <span class="tab-name">OVERVIEW // نايت سيتي</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-rules">
+          <span class="tab-num">02</span>
+          <span class="tab-name">DIRECTIVES // قوانين السيرفر</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-controls">
+          <span class="tab-num">03</span>
+          <span class="tab-name">KEYBINDS // أزرار التحكم</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-changelog">
+          <span class="tab-num">04</span>
+          <span class="tab-name">CHANGELOG // التحديثات</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-network">
+          <span class="tab-num">05</span>
+          <span class="tab-name">NETWORK // المجتمع</span>
+        </button>
+      </nav>
+
+      <div class="tab-panels">
+        <!-- Tab 1: Overview -->
+        <section class="tab-panel active" id="tab-overview">
+          <div class="panel-header">
+            <h2 class="panel-title">WELCOME TO NIGHT CITY // 2077</h2>
+            <span class="panel-badge">DISTRICT: NIGHT CITY METRO</span>
+          </div>
+          <div class="panel-body">
+            <div class="overview-grid">
+              <div class="overview-card highlight-card">
+                <div class="card-icon">⚡</div>
+                <h3>منظومة G-CyberRPcore المتكاملة</h3>
+                <p>مرحباً بك في أضخم وأول إطار عمل متكامل للحياة الواقعية على Cyberpunk 2077. محاكاة شاملة ومطورة لهندسة QBCore الأسطورية مع تطويع كامل لأكواد REDengine ومدينة نايت سيتي.</p>
+              </div>
+              <div class="overview-card">
+                <div class="card-icon">🏢</div>
+                <h3>المؤسسات والوظائف الرسمية</h3>
+                <p>اختر مسارك في المدينة: انضم إلى قوات حفظ النظام في <strong>NCPD</strong>، أو قد فريق الإنقاذ الطبي الطائر في <strong>Trauma Team</strong>، أو أدر ورشتك كـ <strong>Ripperdoc</strong> لتركيب السايبروير، أو استثمر في التاكسي الذكي مع <strong>Delamain</strong>.</p>
+              </div>
+              <div class="overview-card">
+                <div class="card-icon">💀</div>
+                <h3>عصابات الشوارع والوسطاء (Fixers)</h3>
+                <p>تسيطر عصابات Valentinos، Maelstrom، Tyger Claws، و The Mox على مناطق النفوذ. تعاون مع الوسطاء في نايت سيتي لتنفيذ صفقات السلاح، تهريب التكنولوجيا، والسباقات السرية.</p>
+              </div>
+              <div class="overview-card">
+                <div class="card-icon">🧠</div>
+                <h3>نظام السايبروير والـ Cyberpsychosis</h3>
+                <p>كل زرع عصبي تحمله يؤثر على استقرارك الذهني. تابع مستويات الإجهاد (Stress) والتلوث السيبراني عبر الـ HUD العصري للحفاظ على توازنك النفسي وحياتك.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 2: Rules -->
+        <section class="tab-panel" id="tab-rules">
+          <div class="panel-header">
+            <h2 class="panel-title">NIGHT CITY DIRECTIVES // قوانين المجتمع والحياة الواقعية</h2>
+            <span class="panel-badge alert-badge">ENFORCED STRICTLY</span>
+          </div>
+          <div class="panel-body rules-scroll">
+            <div class="rule-box">
+              <div class="rule-index">DIR-01</div>
+              <div class="rule-content">
+                <h4>تقدير قيمة الحياة (FearRP & Value of Life)</h4>
+                <p>حياتك هي أثمن ما تملك في نايت سيتي. يجب عليك إظهار الخوف الطبيعي عند التهديد المباشر بالسلاح أو مواجهة أعداد تفوقك، والتعاون مع الأوامر المنطقية.</p>
+              </div>
+            </div>
+            <div class="rule-box">
+              <div class="rule-index">DIR-02</div>
+              <div class="rule-content">
+                <h4>منع القتل والصدم العشوائي (No RDM & VDM)</h4>
+                <p>يمنع تماماً مهاجمة أو قتل أي لاعب أو دهسه بالمركبة دون وجود سيناريو رول بلاي متكامل ومبرر منطقي مسبق مبني في القصة.</p>
+              </div>
+            </div>
+            <div class="rule-box">
+              <div class="rule-index">DIR-03</div>
+              <div class="rule-content">
+                <h4>استغلال المعلومات والقوة (No Metagaming & Powergaming)</h4>
+                <p>يُحظر استخدام أي معلومات تم الحصول عليها خارج إطار اللعبة (Discord/Streams). كما يُمنع إجبار الطرف الآخر على سيناريوهات مستحيلة دون إعطائه فرصة الرد الواقعي.</p>
+              </div>
+            </div>
+            <div class="rule-box">
+              <div class="rule-index">DIR-04</div>
+              <div class="rule-content">
+                <h4>قانون الحياة الجديدة (New Life Rule - NLR)</h4>
+                <p>في حال موتك وفقدان الوعي ونقلك إلى مشفى Trauma Team، تفقد ذاكرتك بخصوص الأحداث والمواجهة الأخيرة التي أدت إلى إصابتك المميتة.</p>
+              </div>
+            </div>
+            <div class="rule-box">
+              <div class="rule-index">DIR-05</div>
+              <div class="rule-content">
+                <h4>تقمص الهوية والسايبرسايكوسس (Cyberpsychosis RP)</h4>
+                <p>يجب التفاعل مع البيئة المحيطة بأداء واقعي يتناسب مع شخصيتك ومستويات السايبروير المزروع لديك، والالتزام بأوامر الإسعاف وأطباء السايبردوك.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 3: Keybinds -->
+        <section class="tab-panel" id="tab-controls">
+          <div class="panel-header">
+            <h2 class="panel-title">NEURAL KEYBINDS // أزرار التحكم الرئيسية</h2>
+            <span class="panel-badge">DEFAULT CONFIGURATION</span>
+          </div>
+          <div class="panel-body">
+            <div class="keys-grid">
+              <div class="key-card">
+                <span class="key-badge">T</span>
+                <div class="key-desc">
+                  <strong>الشات المكاني والمحلي</strong>
+                  <p>فتح صندوق المحادثة والتواصل بالأوامر (/me, /do, /ooc, /shout).</p>
+                </div>
+              </div>
+              <div class="key-card">
+                <span class="key-badge">F10 / /admin</span>
+                <div class="key-desc">
+                  <strong>قائمة تحكم المسؤولين (Admin Menu)</strong>
+                  <p>لوحة التحكم الشاملة لإدارة اللاعبين والمركبات والطقس والـ Noclip.</p>
+                </div>
+              </div>
+              <div class="key-card">
+                <span class="key-badge">B</span>
+                <div class="key-desc">
+                  <strong>حزام أمان المركبة (Seatbelt)</strong>
+                  <p>ربط أو فك حزام الأمان داخل السيارة لحمايتك من الاصطدام القوي.</p>
+                </div>
+              </div>
+              <div class="key-card">
+                <span class="key-badge">/hudmenu</span>
+                <div class="key-desc">
+                  <strong>تخصيص واجهة الـ HUD</strong>
+                  <p>قائمة تحكم فورية لإظهار أو إخفاء عناصر الشاشة وتعديل الأحجام.</p>
+                </div>
+              </div>
+              <div class="key-card">
+                <span class="key-badge">/clothing</span>
+                <div class="key-desc">
+                  <strong>متجر ومحرر الملابس والسايبروير</strong>
+                  <p>تعديل وتغيير مظهر الشخصية والملابس والزرع العصبي في أي وقت.</p>
+                </div>
+              </div>
+              <div class="key-card">
+                <span class="key-badge">SPACE / M</span>
+                <div class="key-desc">
+                  <strong>التحكم في الموسيقى</strong>
+                  <p>تشغيل وإيقاف أو كتم الصوت بلمسة واحدة أثناء التحميل.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 4: Changelog -->
+        <section class="tab-panel" id="tab-changelog">
+          <div class="panel-header">
+            <h2 class="panel-title">SYSTEM CHANGELOG // سجل تحديثات المنظومة</h2>
+            <span class="panel-badge">BUILD v1.0.0-PROD</span>
+          </div>
+          <div class="panel-body">
+            <div class="changelog-timeline">
+              <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-date">VERSION 1.0.0 — CURRENT RELEASE</div>
+                <div class="timeline-content">
+                  <h4>G-CyberRPcore Unified Ecosystem Launch</h4>
+                  <ul>
+                    <li>🚀 تدشين النواة الأساسية للنظام بهندسة متطابقة مع معايير QBCore.</li>
+                    <li>👥 نظام تعدد الشخصيات (qb-multicharacter) مع اختيار مسار الحياة (Life Path).</li>
+                    <li>👔 محرر المظهر والملابس والسايبروير الشامل (qb-clothing).</li>
+                    <li>🛡️ لوحة تحكم وإدارة المسؤولين العملاقة (qb-adminmenu) مع Noclip و Godmode و Vehicle Spawner.</li>
+                    <li>📊 شاشة الـ HUD المستقبلية (g-cyber-hud) بدوائر الحالة ومؤشر الصوت المتحرك.</li>
+                    <li>🚗 عداد سرعة متكامل للمركبات مع مؤشر غيارات ذكي و RPM حركي وحزام أمان.</li>
+                    <li>🎵 شاشة تحميل تفاعلية عالية التقنية مزودة بـ OST حصري ومحلل موجات صوتي حي.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 5: Network -->
+        <section class="tab-panel" id="tab-network">
+          <div class="panel-header">
+            <h2 class="panel-title">COMMUNITY & OPEN SOURCE // مجتمع المنظومة</h2>
+            <span class="panel-badge">GLOBAL NETWORK</span>
+          </div>
+          <div class="panel-body">
+            <div class="network-grid">
+              <div class="network-card">
+                <div class="card-icon">🐙</div>
+                <h3>Official GitHub Organization</h3>
+                <p>مشروع مفتوح المصدر ومتاح للمطورين حول العالم على GitHub.</p>
+                <div class="net-link">https://github.com/G-CyberRPcore</div>
+              </div>
+              <div class="network-card">
+                <div class="card-icon">💬</div>
+                <h3>Discord & Community Hub</h3>
+                <p>تواصل مع نخبة اللاعبين والمطورين وشارك في تطوير مستقبل نايت سيتي.</p>
+                <div class="net-link">discord.gg/nightcity-rp</div>
+              </div>
+              <div class="network-card">
+                <div class="card-icon">📖</div>
+                <h3>Developer API & Documentation</h3>
+                <p>توثيق برمجي كامل لدوال النواة والأحداث وتطوير الموديولات الإضافية.</p>
+                <div class="net-link">D:/G-CyberRPcore/docs/API.md</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Bottom Loading Dock -->
+    <footer class="loading-bottom-dock">
+      <div class="loading-status-bar">
+        <div class="status-left">
+          <span class="status-spinner"></span>
+          <span class="status-phase" id="status-phase">[SYS_BOOT]</span>
+          <span class="status-text" id="status-text">INITIALIZING SECURE NEURAL HANDSHAKE...</span>
+        </div>
+        <div class="status-right">
+          <span class="status-percent" id="status-percent">0%</span>
+        </div>
+      </div>
+
+      <div class="progress-bar-container">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progress-fill">
+            <div class="scan-light"></div>
+          </div>
+        </div>
+        <div class="progress-segments">
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div class="cta-container" id="cta-container">
+        <button class="jack-in-btn" id="btn-jack-in">
+          <span class="btn-icon">⚡</span>
+          <span class="btn-text">JACK IN // الدخول إلى نايت سيتي</span>
+          <span class="btn-bracket">[ENTER]</span>
+        </button>
+      </div>
+
+      <div class="system-ticker">
+        <span class="ticker-prefix">&gt;&gt;</span>
+        <span class="ticker-content" id="ticker-content">NEURAL LINK VERIFIED // AUDIO BUS MOUNTED: G-CyberRPcore-Loading.mp3</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- =====================================================================
+       LAYER 2: MULTICHARACTER SELECTION (qb-multicharacter style)
+       ===================================================================== -->
+  <div id="view-multicharacter" class="master-layer">
+    <div class="multichar-wrapper">
+      <header class="multichar-header">
+        <div class="multichar-brand">
+          <div class="brand-tag">CITIZEN IDENTITY REPOSITORY // NC-BIOMETRICS</div>
+          <h2>SELECT YOUR CITIZEN // اختيار الشخصية</h2>
+        </div>
+        <div class="multichar-stats">
+          <span class="badge text-cyan">SLOTS: 4</span>
+          <span class="badge text-yellow">DATABASE: ONLINE</span>
+        </div>
+      </header>
+
+      <div class="characters-grid" id="characters-slots-grid">
+        <!-- Rendered dynamically by app.js: 4 slots -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       LAYER 3: CHARACTER & CLOTHING CREATOR (qb-clothing style)
+       ===================================================================== -->
+  <div id="view-creator" class="master-layer">
+    <div class="creator-wrapper">
+      <!-- Left Panel: Customization Form -->
+      <div class="creator-form-panel">
+        <header class="creator-header">
+          <div class="brand-tag">BIOMETRIC DNA ENCODING</div>
+          <h2>CHARACTER INITIALIZATION // إنشاء الشخصية والمظهر</h2>
+        </header>
+
+        <nav class="creator-nav">
+          <button class="creator-nav-btn active" data-step="step-identity">1. IDENTITY (الهوية)</button>
+          <button class="creator-nav-btn" data-step="step-genetics">2. GENETICS (المظهر)</button>
+          <button class="creator-nav-btn" data-step="step-cyberware">3. CYBERWARE (الزرع)</button>
+          <button class="creator-nav-btn" data-step="step-clothing">4. CLOTHING (الملابس)</button>
+        </nav>
+
+        <div class="creator-steps">
+          <!-- Step 1: Identity -->
+          <div class="creator-step active" id="step-identity">
+            <div class="form-group">
+              <label>First Name (الاسم الأول)</label>
+              <input type="text" id="char-firstname" placeholder="e.g. Valerie / Vincent" value="Valerie">
+            </div>
+            <div class="form-group">
+              <label>Last Name (اسم العائلة)</label>
+              <input type="text" id="char-lastname" placeholder="e.g. Street" value="Street">
+            </div>
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Date of Birth (تاريخ الميلاد)</label>
+                <input type="date" id="char-birthdate" value="2054-10-12">
+              </div>
+              <div class="form-group half">
+                <label>Gender (الجنس)</label>
+                <select id="char-gender">
+                  <option value="female">Female (أنثى)</option>
+                  <option value="male">Male (ذكر)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Life Path Selector (Nomad / Streetkid / Corpo) -->
+            <div class="form-group">
+              <label>Life Path (خلفية الشخصية في نايت سيتي)</label>
+              <div class="lifepath-cards">
+                <div class="lifepath-card active" data-lifepath="streetkid">
+                  <div class="lp-icon">🏙️</div>
+                  <h4>STREETKID // ابن الشوارع</h4>
+                  <p>نشأت في أزقة هايوود. تعرف قوانين العصابات وخبايا الشوارع والوسطاء.</p>
+                </div>
+                <div class="lifepath-card" data-lifepath="nomad">
+                  <div class="lp-icon">🏜️</div>
+                  <h4>NOMAD // البادلاندرز</h4>
+                  <p>حر طليق من عائلات الصحراء. خبير محركات وتهريب وبقاء خارج الأسوار.</p>
+                </div>
+                <div class="lifepath-card" data-lifepath="corpo">
+                  <div class="lp-icon">💼</div>
+                  <h4>CORPO // ابن الشركات</h4>
+                  <p>عملت في أبراج الشركات العملاقة. دهاء مالي ومعرفة بدهاليز أراساكا وميليتيك.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Backstory / Bio (قصة الشخصية)</label>
+              <textarea id="char-backstory" rows="2" placeholder="موجز عن قصة شخصيتك ودوافعها في نايت سيتي...">مرتزقة طموحة تسعى لحفر اسمها بين أساطير حانة Afterlife.</textarea>
+            </div>
+          </div>
+
+          <!-- Step 2: Genetics -->
+          <div class="creator-step" id="step-genetics">
+            <div class="form-group">
+              <label>Base Model Archetype (القالب الأساسي)</label>
+              <select id="skin-model">
+                <option value="female_v">Player Female V (نموذج V الأنثوي)</option>
+                <option value="male_v">Player Male V (نموذج V الذكوري)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Skin Tone (لون البشرة): <span id="skin-tone-val" class="text-cyan">3</span></label>
+              <input type="range" id="skin-tone" min="1" max="10" value="3">
+            </div>
+            <div class="form-group">
+              <label>Face Structure (هيكل الوجه): <span id="skin-face-val" class="text-yellow">2</span></label>
+              <input type="range" id="skin-face" min="1" max="10" value="2">
+            </div>
+            <div class="form-group">
+              <label>Eye Color & Optic Scanner (لون الأعين / كيروشي)</label>
+              <select id="skin-eyes">
+                <option value="kiroshi_cyan">Kiroshi Neon Cyan (أزرق نيون مشع)</option>
+                <option value="amber_gold">Optic Amber Gold (ذهبي كهرماني)</option>
+                <option value="cyber_red">Cyber Crimson (أحمر سايبر)</option>
+                <option value="violet_glow">Violet Netrunner (بنفسجي مشع)</option>
+                <option value="natural_brown">Natural Hazel Brown (بني طبيعي)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Hairstyle (قصة الشعر)</label>
+              <select id="skin-hair">
+                <option value="samurai_undercut">Samurai Edgerunner Undercut</option>
+                <option value="punk_mohawk">Cyber Mohawk (الموهوك النيوني)</option>
+                <option value="corpo_slick">Corpo Executive Slick Back</option>
+                <option value="street_dreads">Night City Cyber Dreads</option>
+                <option value="buzz_fade">Tactical Buzz Fade</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Hair Color (لون الشعر)</label>
+              <select id="skin-haircolor">
+                <option value="neon_blue">Electric Neon Blue (أزرق كهربائي)</option>
+                <option value="cyber_yellow">Cyber Yellow (أصفر نيون)</option>
+                <option value="blood_crimson">Blood Crimson (أحمر ناري)</option>
+                <option value="platinum_white">Platinum White (أبيض بلاتيني)</option>
+                <option value="pitch_black">Pitch Carbon Black (أسود كربوني)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Step 3: Cyberware -->
+          <div class="creator-step" id="step-cyberware">
+            <div class="form-group">
+              <label>Facial Cyberware (الزرع السيبراني في الوجه)</label>
+              <select id="skin-cyberware">
+                <option value="clean">Clean Natural (بدون زرع ظاهر)</option>
+                <option value="tactical_lines">Tactical Synapse Lines (خطوط موصلات عصبية دقيقة)</option>
+                <option value="optic_plate">Titanium Optic Plate (شريحة حماية للعين)</option>
+                <option value="jaw_reinforce">Reinforced Titanium Jaw (فك تيتانيوم مقوى)</option>
+                <option value="full_combat">Full Combat Cyber-Mask (قناع قتالي هجين)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tattoos & Body Scars (الوشوم والندوب)</label>
+              <select id="skin-tattoos">
+                <option value="none">No Markings (نظيف)</option>
+                <option value="valentinos_skull">Valentinos Sacred Skull (وشم جمجمة فالنتينو)</option>
+                <option value="arasaka_barcode">Corpo Barcode & Serial (باركود أراساكا)</option>
+                <option value="circuit_sleeve">Netrunner Circuit Sleeve (وشم الدوائر الإلكترونية)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Step 4: Clothing -->
+          <div class="creator-step" id="step-clothing">
+            <div class="form-group">
+              <label>Preset Outfit Collection (مجموعات الأزياء الجاهزة)</label>
+              <div class="outfit-presets">
+                <button type="button" class="preset-btn active" data-preset="streetwear">Samurai Streetwear</button>
+                <button type="button" class="preset-btn" data-preset="corpo">Corpo Executive Suit</button>
+                <button type="button" class="preset-btn" data-preset="nomad">Nomad Highway Vest</button>
+                <button type="button" class="preset-btn" data-preset="netrunner">Netrunner Stealth Suit</button>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Headwear (الرأس والنظارات)</label>
+                <select id="clothing-head">
+                  <option value="none">None (بدون)</option>
+                  <option value="tech_aviator">Tech Aviators (نظارات شمسية ذكية)</option>
+                  <option value="neural_visor">Neural Visor (نظارة سايبربانك ليزرية)</option>
+                  <option value="tactical_cap">Samurai Tactical Cap</option>
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Face Mask (الكمامة والقناع)</label>
+                <select id="clothing-mask">
+                  <option value="none">None (بدون)</option>
+                  <option value="oni_respirator">Oni Tech Respirator (كمامة أوني يابانية)</option>
+                  <option value="tactical_balaclava">Tactical Balaclava</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Outer Jacket (الجاكيت والمعطف)</label>
+                <select id="clothing-jacket">
+                  <option value="samurai_leather">Samurai Crystal Leather Jacket</option>
+                  <option value="corpo_trench">High-Collar Corpo Trench Coat</option>
+                  <option value="nomad_denim">Reinforced Nomad Denim Vest</option>
+                  <option value="tactical_vest">Militech Armored Tactical Vest</option>
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Lower Pants (البنطال)</label>
+                <select id="clothing-pants">
+                  <option value="tactical_cargo">Tactical Cargo Pants (جيوب قتالية)</option>
+                  <option value="corpo_slacks">Tailored Corpo Slacks</option>
+                  <option value="reinforced_jeans">Reinforced Nomad Biker Jeans</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="creator-footer">
+          <button class="action-btn back-btn" id="btn-cancel-creation">CANCEL // رجوع</button>
+          <button class="action-btn next-btn" id="btn-creator-next">NEXT STEP // التالي</button>
+          <button class="action-btn spawn-btn" id="btn-save-character" style="display: none;">INITIALIZE CITIZEN IN NIGHT CITY // تأكيد ودخول 🚀</button>
+        </footer>
+      </div>
+
+      <!-- Right Panel: Live Citizen Hologram Card -->
+      <div class="creator-preview-panel">
+        <div class="holo-card">
+          <div class="holo-header">
+            <span class="holo-code">NC-CITIZEN-SCAN</span>
+            <span class="holo-status text-green">LIVE</span>
+          </div>
+          <div class="holo-avatar-box">
+            <div class="avatar-ring"></div>
+            <div class="holo-silhouette">👤</div>
+          </div>
+          <div class="holo-details">
+            <div class="detail-row">
+              <span class="detail-label">CITIZEN NAME:</span>
+              <span class="detail-val" id="prev-name">Valerie Street</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">LIFE PATH:</span>
+              <span class="detail-val text-yellow" id="prev-lifepath">STREETKID</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">GENETICS:</span>
+              <span class="detail-val" id="prev-genetics">Female V // Skin #3</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">OPTIC IMPLANT:</span>
+              <span class="detail-val text-cyan" id="prev-eyes">Kiroshi Neon Cyan</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">STARTING CASH:</span>
+              <span class="detail-val text-green">$1,500</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">STARTING BANK:</span>
+              <span class="detail-val text-green">$10,000</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">APARTMENT:</span>
+              <span class="detail-val">Megabuilding H10, Watson</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       LAYER 4: IN-GAME HUD (g-cyber-hud style)
+       ===================================================================== -->
+  <div id="view-hud" class="master-layer">
+    <!-- Top-Right Neural Telemetry Panel -->
+    <div class="hud-top-right">
+      <div class="neural-panel">
+        <div class="neural-header">
+          <span class="net-status">● NIGHT CITY NET</span>
+          <span class="neural-time" id="hud-clock">22:45</span>
+        </div>
+        <div class="location-tag" id="hud-location">LITTLE CHINA, WATSON</div>
+        <div class="finance-block">
+          <div class="finance-item">
+            <span class="fin-label">CASH</span>
+            <span class="fin-val text-green" id="hud-cash">$5,000</span>
+          </div>
+          <div class="finance-item">
+            <span class="fin-label">BANK</span>
+            <span class="fin-val text-cyan" id="hud-bank">$25,000</span>
+          </div>
+          <div class="finance-item">
+            <span class="fin-label">CRYPTO</span>
+            <span class="fin-val text-yellow" id="hud-crypto">150 ⟠</span>
+          </div>
+        </div>
+        <div class="identity-block">
+          <span id="hud-charname">Valerie Street</span>
+          <span class="id-pill" id="hud-citizenid">NC-481924</span>
+          <span class="job-badge" id="hud-job">CIVILIAN</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom-Left Circular Status Gauges -->
+    <div class="hud-bottom-left">
+      <div class="status-rings-container">
+        <!-- Voice Dial -->
+        <div class="dial-item" id="dial-voice" title="Voice Range (Z)">
+          <svg class="ring-svg" viewBox="0 0 60 60">
+            <circle class="ring-bg" cx="30" cy="30" r="24"></circle>
+            <circle class="ring-fill ring-voice" id="ring-voice-fill" cx="30" cy="30" r="24"></circle>
+          </svg>
+          <div class="dial-center">
+            <span class="voice-wave" id="voice-wave">~</span>
+          </div>
+          <span class="dial-caption" id="voice-range-label">15M</span>
+        </div>
+
+        <!-- Health Dial -->
+        <div class="dial-item" id="dial-health" title="Health">
+          <svg class="ring-svg" viewBox="0 0 60 60">
+            <circle class="ring-bg" cx="30" cy="30" r="24"></circle>
+            <circle class="ring-fill ring-health" id="ring-health-fill" cx="30" cy="30" r="24"></circle>
+          </svg>
+          <div class="dial-center">❤️</div>
+          <span class="dial-caption" id="health-val">100%</span>
+        </div>
+
+        <!-- Armor Dial -->
+        <div class="dial-item" id="dial-armor" title="Armor">
+          <svg class="ring-svg" viewBox="0 0 60 60">
+            <circle class="ring-bg" cx="30" cy="30" r="24"></circle>
+            <circle class="ring-fill ring-armor" id="ring-armor-fill" cx="30" cy="30" r="24"></circle>
+          </svg>
+          <div class="dial-center">🛡️</div>
+          <span class="dial-caption" id="armor-val">100%</span>
+        </div>
+
+        <!-- Hunger Dial -->
+        <div class="dial-item" id="dial-hunger" title="Energy / Food">
+          <svg class="ring-svg" viewBox="0 0 60 60">
+            <circle class="ring-bg" cx="30" cy="30" r="24"></circle>
+            <circle class="ring-fill ring-hunger" id="ring-hunger-fill" cx="30" cy="30" r="24"></circle>
+          </svg>
+          <div class="dial-center">⚡</div>
+          <span class="dial-caption" id="hunger-val">95%</span>
+        </div>
+
+        <!-- Thirst Dial -->
+        <div class="dial-item" id="dial-thirst" title="Hydration">
+          <svg class="ring-svg" viewBox="0 0 60 60">
+            <circle class="ring-bg" cx="30" cy="30" r="24"></circle>
+            <circle class="ring-fill ring-thirst" id="ring-thirst-fill" cx="30" cy="30" r="24"></circle>
+          </svg>
+          <div class="dial-center">💧</div>
+          <span class="dial-caption" id="thirst-val">90%</span>
+        </div>
+
+        <!-- Stress / Cyberpsychosis Dial -->
+        <div class="dial-item" id="dial-stress" title="Cyberpsychosis / Stress">
+          <svg class="ring-svg" viewBox="0 0 60 60">
+            <circle class="ring-bg" cx="30" cy="30" r="24"></circle>
+            <circle class="ring-fill ring-stress" id="ring-stress-fill" cx="30" cy="30" r="24"></circle>
+          </svg>
+          <div class="dial-center">🧠</div>
+          <span class="dial-caption" id="stress-val">5%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom-Right Vehicle Speedometer HUD -->
+    <div class="hud-bottom-right" id="vehicle-hud" style="display: none;">
+      <div class="veh-card">
+        <div class="speed-cluster">
+          <span class="speed-number" id="veh-speed">0</span>
+          <span class="speed-unit">KM/H</span>
+        </div>
+        <div class="gear-badge" id="veh-gear">P</div>
+        <div class="rpm-track">
+          <div class="rpm-fill" id="veh-rpm-fill" style="width: 20%;"></div>
+        </div>
+        <div class="veh-status-row">
+          <span class="veh-indicator" id="veh-seatbelt">SEATBELT [B]</span>
+          <span class="veh-indicator" id="veh-fuel">FUEL: 85%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       LAYER 5: PROXIMITY RP CHAT (T key)
+       ===================================================================== -->
+  <div id="view-chat" class="chat-layer">
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <!-- Messages appended dynamically -->
+      </div>
+      <div class="chat-input-wrapper" id="chat-input-wrapper">
+        <span class="chat-prompt">&gt;</span>
+        <input type="text" id="chat-input" placeholder="Type a message or command (/me, /do, /admin)..." maxlength="250" autocomplete="off">
+        <span class="chat-help-hint">[ESC] CLOSE • [ENTER] SEND</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       LAYER 6: ADMIN CONTROL PANEL (qb-adminmenu style - F10 / /admin)
+       ===================================================================== -->
+  <div id="view-admin" class="master-layer">
+    <div class="admin-wrapper">
+      <header class="admin-header">
+        <div class="admin-brand">
+          <span class="admin-shield">🛡️</span>
+          <div>
+            <h2>NIGHT CITY ADMIN CONSOLE // G-CYBERRPCORE</h2>
+            <div class="admin-tag">MASTER MANAGEMENT TERMINAL // LEVEL: GOD / ADMIN</div>
+          </div>
+        </div>
+        <div class="admin-stats">
+          <span class="badge text-green" id="admin-player-count">PLAYERS: 1</span>
+          <span class="badge text-yellow">TICK: 60 HZ</span>
+          <button class="admin-close-btn" id="btn-close-admin">✕ [ESC]</button>
+        </div>
+      </header>
+
+      <div class="admin-body">
+        <!-- Navigation Sidebar -->
+        <nav class="admin-sidebar">
+          <button class="admin-nav-btn active" data-admin-tab="adm-players">
+            <span>👥</span> Players (إدارة اللاعبين)
+          </button>
+          <button class="admin-nav-btn" data-admin-tab="adm-self">
+            <span>🛡️</span> Self Options (خيارات المسؤول)
+          </button>
+          <button class="admin-nav-btn" data-admin-tab="adm-vehicles">
+            <span>🚗</span> Vehicle Spawner (المركبات)
+          </button>
+          <button class="admin-nav-btn" data-admin-tab="adm-server">
+            <span>🌦️</span> Server & Weather (السيرفر والطقس)
+          </button>
+          <button class="admin-nav-btn" data-admin-tab="adm-devtools">
+            <span>🛠️</span> Developer Tools (أدوات التطوير)
+          </button>
+        </nav>
+
+        <!-- Admin Content Panels -->
+        <div class="admin-panels">
+          <!-- 1. Players Management -->
+          <div class="admin-panel active" id="adm-players">
+            <div class="admin-panel-header">
+              <h3>CONNECTED PLAYERS LIST</h3>
+              <input type="text" id="admin-search-player" placeholder="Search by name or ID..." class="admin-search">
+            </div>
+            <div class="admin-players-grid" id="admin-players-list">
+              <!-- Rendered dynamically -->
+            </div>
+            <div class="admin-actions-bar" id="admin-selected-player-actions" style="display: none;">
+              <h4 id="admin-selected-title">ACTIONS FOR PLAYER: V (#0)</h4>
+              <div class="actions-row">
+                <button class="adm-btn" id="btn-adm-tp">Teleport To</button>
+                <button class="adm-btn" id="btn-adm-bring">Bring Player</button>
+                <button class="adm-btn" id="btn-adm-freeze">Freeze / Unfreeze</button>
+                <button class="adm-btn btn-success" id="btn-adm-revive">Revive</button>
+                <button class="adm-btn btn-success" id="btn-adm-heal">Heal Max</button>
+                <button class="adm-btn btn-primary" id="btn-adm-givemoney">Give $10,000 Cash</button>
+                <button class="adm-btn btn-primary" id="btn-adm-setjob">Set Job: NCPD</button>
+                <button class="adm-btn btn-danger" id="btn-adm-kick">Kick Player</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Self Options (Godmode, Noclip, etc.) -->
+          <div class="admin-panel" id="adm-self">
+            <h3>ADMIN SELF PRIVILEGES & CHEATS</h3>
+            <div class="self-cards-grid">
+              <div class="toggle-card">
+                <div>
+                  <strong>Godmode (الخلود)</strong>
+                  <p>حماية تامة من الرصاص، السقوط، الحروق، والضربات.</p>
+                </div>
+                <input type="checkbox" id="chk-godmode" class="toggle-switch">
+              </div>
+
+              <div class="toggle-card">
+                <div>
+                  <strong>Noclip Flight (الطيران واختراق الجدران)</strong>
+                  <p>التحليق بحرية عبر المباني والخرائط (WASD + Space/Shift).</p>
+                </div>
+                <input type="checkbox" id="chk-noclip" class="toggle-switch">
+              </div>
+
+              <div class="toggle-card">
+                <div>
+                  <strong>Invisibility (التخفي التام)</strong>
+                  <p>إخفاء نموذج اللاعب عن عيون اللاعبين والشرطة.</p>
+                </div>
+                <input type="checkbox" id="chk-invisible" class="toggle-switch">
+              </div>
+
+              <div class="toggle-card">
+                <div>
+                  <strong>Infinite Stamina (لياقة لا نهائية)</strong>
+                  <p>الركض والقفز والمراوغة دون استهلاك طاقة الجسد.</p>
+                </div>
+                <input type="checkbox" id="chk-stamina" class="toggle-switch" checked>
+              </div>
+            </div>
+
+            <div class="self-quick-actions">
+              <button class="adm-btn btn-success" id="btn-self-heal">Heal & Max Armor Now</button>
+              <button class="adm-btn btn-success" id="btn-self-stress">Clear Cyberpsychosis & Stress</button>
+            </div>
+
+            <h4 style="margin-top: 20px;">QUICK TELEPORT TO NIGHT CITY DISTRICTS (الانتقال السريع للمناطق)</h4>
+            <div class="tp-districts-grid">
+              <button class="adm-tp-btn" data-tp="corpo_plaza">🏢 Corpo Plaza (City Center)</button>
+              <button class="adm-tp-btn" data-tp="megabuilding_h10">🏢 Megabuilding H10 (Watson)</button>
+              <button class="adm-tp-btn" data-tp="afterlife">🍸 Afterlife Club (Kabuki)</button>
+              <button class="adm-tp-btn" data-tp="pacifica_pier">🏖️ Pacifica Grand Imperial</button>
+              <button class="adm-tp-btn" data-tp="santo_domingo">🏭 Santo Domingo Overlook</button>
+              <button class="adm-tp-btn" data-tp="badlands_camp">🏜️ Badlands Nomad Camp</button>
+              <button class="adm-tp-btn" data-tp="arasaka_roof">🗼 Arasaka Tower Roof</button>
+            </div>
+          </div>
+
+          <!-- 3. Vehicles Spawner -->
+          <div class="admin-panel" id="adm-vehicles">
+            <h3>VEHICLE SPAWNER & TOOLS</h3>
+            <div class="veh-spawn-grid">
+              <button class="veh-spawn-card" data-spawn="QuadraTurboR">
+                <strong>Quadra Turbo-R V-Tech</strong>
+                <span>Sport Supercar</span>
+              </button>
+              <button class="veh-spawn-card" data-spawn="RayfieldCaliburn">
+                <strong>Rayfield Caliburn</strong>
+                <span>Hypercar (1000 HP)</span>
+              </button>
+              <button class="veh-spawn-card" data-spawn="ArchNazare">
+                <strong>Arch Nazaré</strong>
+                <span>Sport Motorcycle</span>
+              </button>
+              <button class="veh-spawn-card" data-spawn="PoliceCruiser">
+                <strong>NCPD Villefort Cruiser</strong>
+                <span>Law Enforcement Unit</span>
+              </button>
+              <button class="veh-spawn-card" data-spawn="Ambulance">
+                <strong>Trauma Team Unit</strong>
+                <span>Medical Responder</span>
+              </button>
+            </div>
+
+            <h4 style="margin-top: 20px;">CURRENT VEHICLE UTILITIES</h4>
+            <div class="actions-row">
+              <button class="adm-btn btn-success" id="btn-veh-repair">Repair & Wash Vehicle</button>
+              <button class="adm-btn btn-primary" id="btn-veh-flip">Flip Vehicle Upright</button>
+              <button class="adm-btn btn-danger" id="btn-veh-delete">Delete Vehicle</button>
+            </div>
+          </div>
+
+          <!-- 4. Server & Environment -->
+          <div class="admin-panel" id="adm-server">
+            <h3>SERVER ENVIRONMENT CONTROLLER</h3>
+            <div class="env-section">
+              <h4>Weather Manipulation (الطقس)</h4>
+              <div class="weather-buttons">
+                <button class="weather-btn" data-weather="sunny">☀️ Sunny Clear</button>
+                <button class="weather-btn" data-weather="rain">🌧️ Heavy Rain</button>
+                <button class="weather-btn" data-weather="acid_rain">☣️ Acid Rain</button>
+                <button class="weather-btn" data-weather="fog">🌫️ Cyber Fog</button>
+                <button class="weather-btn" data-weather="sandstorm">🏜️ Badlands Sandstorm</button>
+              </div>
+            </div>
+
+            <div class="env-section" style="margin-top: 20px;">
+              <h4>Time of Day (الوقت)</h4>
+              <div class="weather-buttons">
+                <button class="time-btn" data-time="6">🌅 06:00 Dawn</button>
+                <button class="time-btn" data-time="12">☀️ 12:00 Noon</button>
+                <button class="time-btn" data-time="19">🌆 19:00 Sunset</button>
+                <button class="time-btn" data-time="0">🌙 00:00 Midnight</button>
+              </div>
+            </div>
+
+            <div class="env-section" style="margin-top: 20px;">
+              <h4>Server-Wide Holographic Announcement (إذاعة خبر لجميع اللاعبين)</h4>
+              <div class="announce-box">
+                <input type="text" id="admin-announce-input" placeholder="Type announcement text here..." class="admin-search">
+                <button class="adm-btn btn-primary" id="btn-adm-send-announce">Broadcast Announcement 📢</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Developer Tools -->
+          <div class="admin-panel" id="adm-devtools">
+            <h3>DEVELOPER & ENTITY TOOLS</h3>
+            <div class="coords-box">
+              <h4>Current Player Coordinates (إحداثياتك الحالية)</h4>
+              <div class="coords-display" id="admin-coords-display">
+                X: -1392.50 | Y: 1271.20 | Z: 123.00 | Heading: 90.0°
+              </div>
+              <button class="adm-btn btn-primary" id="btn-copy-coords">COPY VECTOR4 COORDS TO CLIPBOARD 📋</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

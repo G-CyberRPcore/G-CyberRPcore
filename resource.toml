@@ -2,9 +2,17 @@
 
 server_script = "./server.js"
 client_script = "./client.js"
+cef_url = "./ui/index.html"
 
 file = [
-  "./assets/*"
+  "./ui/index.html",
+  "./ui/style.css",
+  "./ui/app.js",
+  "./ui/audio/G-CyberRPcore-Loading.mp3",
+  "./ui/assets/logo.svg",
+  "./ui/assets/logo.jpg",
+  "./assets/logo.svg",
+  "./assets/logo.jpg"
 ]
 
 use_game_natives = "true"
