@@ -1,0 +1,28 @@
+{
+  "name": "@g-cyberrpcore/framework",
+  "version": "1.0.0",
+  "description": "The Definitive Modular Roleplay Framework for Cyberpunk 2077 (CyberMP) - Inspired by QBCore",
+  "main": "server.js",
+  "scripts": {
+    "test": "node --check server.js core/index.js core/player.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/G-CyberRPcore/G-CyberRPcore.git"
+  },
+  "keywords": [
+    "cyberpunk2077",
+    "cybermp",
+    "roleplay",
+    "qbcore",
+    "framework",
+    "multiplayer",
+    "g-cyberrpcore"
+  ],
+  "author": "G-CyberRPcore Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/G-CyberRPcore/G-CyberRPcore/issues"
+  },
+  "homepage": "https://github.com/G-CyberRPcore"
+}
