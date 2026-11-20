@@ -831,6 +831,10 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     applyCreatorClothingPreview(clothingJson);
   });
 
+  mp.events.onCef('g-cyber:creator:focusNative', (nativeMode) => {
+    safeSetFocus(!nativeMode, !nativeMode);
+  });
+
   // Chat CEF Events
   mp.events.onCef('chatSubmit', (text) => {
     safeSetFocus(false, false);

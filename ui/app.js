@@ -404,13 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         card.querySelector('.char-delete-btn').addEventListener('click', () => {
-          if (confirm(`Are you sure you want to permanently delete citizen ${char.charinfo.firstname} ${char.charinfo.lastname}?`)) {
-            if (window.mp && mp.events) {
-              mp.events.emit('g-cyber:characters:delete', char.citizenid);
-            }
-            showToast('Identity Purged', 'Character data erased from Night City records.', 'error');
-            setTimeout(fetchCharactersAndRender, 400);
-          }
+          showDeleteConfirmModal(char);
         });
       } else {
         card.className = 'char-card empty-card';
@@ -438,11 +432,82 @@ document.addEventListener('DOMContentLoaded', () => {
     updateHUDFromCharacter(char);
   }
 
+  // In-Game Identity Deletion Modal Handlers
+  let pendingDeleteCitizen = null;
+
+  function showDeleteConfirmModal(char) {
+    pendingDeleteCitizen = char;
+    const modal = document.getElementById('modal-delete-confirm');
+    if (modal) {
+      const nameEl = document.getElementById('modal-delete-char-name');
+      const idEl = document.getElementById('modal-delete-char-id');
+      if (nameEl) nameEl.textContent = `${char.charinfo.firstname} ${char.charinfo.lastname}`;
+      if (idEl) idEl.textContent = char.citizenid;
+      modal.style.display = 'flex';
+    }
+  }
+
+  function hideDeleteConfirmModal() {
+    pendingDeleteCitizen = null;
+    const modal = document.getElementById('modal-delete-confirm');
+    if (modal) modal.style.display = 'none';
+  }
+
+  const btnModalCancelDelete = document.getElementById('btn-modal-cancel-delete');
+  if (btnModalCancelDelete) {
+    btnModalCancelDelete.addEventListener('click', hideDeleteConfirmModal);
+  }
+
+  const btnModalConfirmDelete = document.getElementById('btn-modal-confirm-delete');
+  if (btnModalConfirmDelete) {
+    btnModalConfirmDelete.addEventListener('click', () => {
+      if (pendingDeleteCitizen) {
+        const citizenid = pendingDeleteCitizen.citizenid;
+        if (window.mp && mp.events) {
+          mp.events.emit('g-cyber:characters:delete', citizenid);
+        }
+        showToast('Identity Purged', `Citizen record ${citizenid} erased from Night City.`, 'error');
+        hideDeleteConfirmModal();
+        setTimeout(fetchCharactersAndRender, 400);
+      }
+    });
+  }
+
   // =====================================================================
   // 5. Character & Clothing Creator
   // =====================================================================
   let targetCreationSlot = 1;
   let selectedLifePath = 'streetkid';
+
+  // Floating Sidebar Toggle
+  const btnToggleCreatorSidebar = document.getElementById('btn-toggle-creator-sidebar');
+  const creatorFormPanel = document.getElementById('creator-form-panel');
+  let isCreatorSidebarCollapsed = false;
+
+  function toggleCreatorSidebar(forceState) {
+    if (!creatorFormPanel || !btnToggleCreatorSidebar) return;
+    isCreatorSidebarCollapsed = (forceState !== undefined) ? Boolean(forceState) : !isCreatorSidebarCollapsed;
+    creatorFormPanel.classList.toggle('collapsed', isCreatorSidebarCollapsed);
+    btnToggleCreatorSidebar.classList.toggle('panel-hidden', isCreatorSidebarCollapsed);
+
+    const icon = btnToggleCreatorSidebar.querySelector('.toggle-icon');
+    const label = btnToggleCreatorSidebar.querySelector('.toggle-label');
+
+    if (isCreatorSidebarCollapsed) {
+      if (icon) icon.textContent = '▶';
+      if (label) label.textContent = 'SHOW SERVER PANEL';
+      showToast('Panel Minimized', 'Server panel collapsed. Enjoy full-screen 3D customization!', 'info');
+      if (window.mp && mp.events) mp.events.emit('g-cyber:creator:focusNative', true);
+    } else {
+      if (icon) icon.textContent = '◀';
+      if (label) label.textContent = 'HIDE SERVER PANEL';
+      if (window.mp && mp.events) mp.events.emit('g-cyber:creator:focusNative', false);
+    }
+  }
+
+  if (btnToggleCreatorSidebar) {
+    btnToggleCreatorSidebar.addEventListener('click', () => toggleCreatorSidebar());
+  }
 
   function openCharacterCreator(slotNum) {
     targetCreationSlot = slotNum;
@@ -476,20 +541,55 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function resetCreatorSteps() {
+    toggleCreatorSidebar(false);
     setCreatorStep(0);
   }
 
   creatorNavBtns.forEach((btn, idx) => {
-    btn.addEventListener('click', () => setCreatorStep(idx));
+    btn.addEventListener('click', () => {
+      // If navigating directly to Genetics/Appearance (step 1) from identity, validate name and launch native creator
+      if (idx === 1 && currentStepIdx === 0) {
+        const firstName = (document.getElementById('char-firstname').value || '').trim();
+        const lastName = (document.getElementById('char-lastname').value || '').trim();
+        if (!firstName || !lastName) {
+          showToast('Incomplete Identity', 'Please enter a valid First and Last Name before customizing appearance.', 'warning');
+          return;
+        }
+        if (window.mp && mp.events) {
+          mp.events.emit('g-cyber:creator:openNativeCreator', 'MenuScenario_CharacterCustomization');
+        }
+        showToast('3D Character Studio', 'Cyberpunk 2077 Character Creator opened! Use the top toggle button to show/hide this panel anytime.', 'success');
+      }
+      setCreatorStep(idx);
+    });
   });
 
   btnCreatorNext.addEventListener('click', () => {
+    // When finishing Step 0 (Identity), validate name & automatically open MenuScenario_CharacterCustomization
+    if (currentStepIdx === 0) {
+      const firstName = (document.getElementById('char-firstname').value || '').trim();
+      const lastName = (document.getElementById('char-lastname').value || '').trim();
+      if (!firstName || !lastName) {
+        showToast('Incomplete Identity', 'Please enter a valid First and Last Name before proceeding.', 'warning');
+        return;
+      }
+      // Move to Genetics / Appearance
+      setCreatorStep(1);
+      // Automatically trigger Cyberpunk 2077 original character creator scenario!
+      if (window.mp && mp.events) {
+        mp.events.emit('g-cyber:creator:openNativeCreator', 'MenuScenario_CharacterCustomization');
+      }
+      showToast('3D Character Studio', 'Cyberpunk 2077 Character Creator opened! Use the top button to toggle server panel.', 'success');
+      return;
+    }
+
     if (currentStepIdx < stepIds.length - 1) {
       setCreatorStep(currentStepIdx + 1);
     }
   });
 
   btnCancelCreation.addEventListener('click', () => {
+    toggleCreatorSidebar(false);
     showView(viewMultichar);
   });
 
@@ -982,6 +1082,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } else if (viewMultichar && viewMultichar.classList.contains('active')) {
       if (e.key === 'Escape' || e.code === 'Escape') {
+        const deleteModal = document.getElementById('modal-delete-confirm');
+        if (deleteModal && deleteModal.style.display === 'flex') {
+          e.preventDefault();
+          hideDeleteConfirmModal();
+          return;
+        }
         e.preventDefault();
         skipLoadingAndPlay();
         return;

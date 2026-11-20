@@ -385,6 +385,39 @@
       <div class="characters-grid" id="characters-slots-grid">
         <!-- Rendered dynamically by app.js: 4 slots -->
       </div>
+
+      <!-- In-Game Cyberpunk Confirmation Modal for Identity Deletion -->
+      <div id="modal-delete-confirm" class="cyber-modal-backdrop" style="display: none;">
+        <div class="cyber-modal-window">
+          <header class="modal-header">
+            <div class="modal-alert-icon">⚠️</div>
+            <div class="modal-title-wrap">
+              <span class="modal-subtag">TERMINATION PROTOCOL // CRITICAL DELETION</span>
+              <h3 class="modal-headline">PURGE CITIZEN IDENTITY</h3>
+            </div>
+          </header>
+
+          <div class="modal-body-content">
+            <p class="modal-msg">Are you sure you want to permanently erase citizen record <strong id="modal-delete-char-name" class="text-yellow"></strong>?</p>
+            <div class="modal-info-box">
+              <div class="modal-info-row">
+                <span class="info-label">CITIZEN ID:</span>
+                <span class="info-val text-cyan" id="modal-delete-char-id">NC-000000</span>
+              </div>
+              <div class="modal-info-row">
+                <span class="info-label">SECURITY PROTOCOL:</span>
+                <span class="info-val text-pink">PERMANENT IRREVERSIBLE PURGE</span>
+              </div>
+            </div>
+            <p class="modal-footnote">All assets, cash, bank deposits, inventory, apartments, cyberware, and criminal records associated with this neural signature will be destroyed immediately from the Night City database.</p>
+          </div>
+
+          <footer class="modal-footer-actions">
+            <button type="button" class="modal-btn btn-modal-cancel" id="btn-modal-cancel-delete">CANCEL [ESC]</button>
+            <button type="button" class="modal-btn btn-modal-confirm-delete" id="btn-modal-confirm-delete">CONFIRM TERMINATION // PURGE</button>
+          </footer>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -392,9 +425,15 @@
        LAYER 3: CHARACTER & CLOTHING CREATOR
        ===================================================================== -->
   <div id="view-creator" class="master-layer">
+    <!-- Floating Sidebar Toggle Button -->
+    <button type="button" id="btn-toggle-creator-sidebar" class="creator-sidebar-toggle-btn" title="Toggle Server Sidebar">
+      <span class="toggle-icon">◀</span>
+      <span class="toggle-label">HIDE SERVER PANEL</span>
+    </button>
+
     <div class="creator-wrapper">
       <!-- Left Panel: Customization Form -->
-      <div class="creator-form-panel">
+      <div class="creator-form-panel" id="creator-form-panel">
         <header class="creator-header">
           <div class="brand-tag">BIOMETRIC DNA ENCODING</div>
           <h2>CHARACTER INITIALIZATION // BIOMETRIC SETUP</h2>
