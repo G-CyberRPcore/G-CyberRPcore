@@ -1,2 +1,4 @@
 # Ignore AGENTS.md
 AGENTS.md
+node_modules/
+package-lock.json
