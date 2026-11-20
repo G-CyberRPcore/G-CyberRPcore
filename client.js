@@ -201,13 +201,19 @@ function startNoclipFlight() {
     const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
     if (localPlayer) {
       if (typeof localPlayer.setCollision === 'function') localPlayer.setCollision(false);
-      if (localPlayer.position) {
+      if (localPlayer.position && Array.isArray(localPlayer.position) && localPlayer.position.length >= 3) {
         noclipPosition = [localPlayer.position[0], localPlayer.position[1], localPlayer.position[2]];
+      }
+    }
+    const p = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    if (p && typeof p.GetWorldPosition === 'function') {
+      const wp = p.GetWorldPosition();
+      if (wp && typeof wp.x === 'number') {
+        noclipPosition = [wp.x, wp.y, wp.z];
       }
     }
   } catch (e) {}
 
-  const speed = 1.35;
   noclipInterval = setInterval(() => {
     if (!isNoclipActive) {
       clearInterval(noclipInterval);
@@ -215,10 +221,14 @@ function startNoclipFlight() {
       return;
     }
 
-    let moved = false;
+    const baseSpeed = 1.35;
+    // Shift (16) provides 2.5x speed boost
+    const speed = keyStates[16] ? (baseSpeed * 2.5) : baseSpeed;
+
     let forwardVec = [0, 1, 0];
     let rightVec = [1, 0, 0];
     let upVec = [0, 0, 1];
+    let yaw = 0.0;
 
     try {
       const camSys = mp.game.ScriptGameInstance.GetCameraSystem();
@@ -226,64 +236,55 @@ function startNoclipFlight() {
         const f = camSys.GetActiveCameraForward();
         const r = camSys.GetActiveCameraRight();
         const u = camSys.GetActiveCameraUp();
-        if (f) forwardVec = [f.x || 0, f.y || 0, f.z || 0];
+        if (f) {
+          forwardVec = [f.x || 0, f.y || 0, f.z || 0];
+          yaw = Math.atan2(f.y, f.x) * (180 / Math.PI);
+        }
         if (r) rightVec = [r.x || 0, r.y || 0, r.z || 0];
         if (u) upVec = [u.x || 0, u.y || 0, u.z || 0];
       }
     } catch (e) {}
 
-    // W = 87, S = 83, A = 65, D = 68, Space = 32, Shift = 16, C = 67
+    // Flight directional controls:
+    // W = 87 (Forward), S = 83 (Backward), D = 68 (Right), A = 65 (Left)
+    // Space = 32 or E = 69 (Ascend), C = 67 or Ctrl = 17 or Q = 81 (Descend)
     if (keyStates[87]) { // W Forward
       noclipPosition[0] += forwardVec[0] * speed;
       noclipPosition[1] += forwardVec[1] * speed;
       noclipPosition[2] += forwardVec[2] * speed;
-      moved = true;
     }
     if (keyStates[83]) { // S Backward
       noclipPosition[0] -= forwardVec[0] * speed;
       noclipPosition[1] -= forwardVec[1] * speed;
       noclipPosition[2] -= forwardVec[2] * speed;
-      moved = true;
     }
     if (keyStates[68]) { // D Right
       noclipPosition[0] += rightVec[0] * speed;
       noclipPosition[1] += rightVec[1] * speed;
       noclipPosition[2] += rightVec[2] * speed;
-      moved = true;
     }
     if (keyStates[65]) { // A Left
       noclipPosition[0] -= rightVec[0] * speed;
       noclipPosition[1] -= rightVec[1] * speed;
       noclipPosition[2] -= rightVec[2] * speed;
-      moved = true;
     }
-    if (keyStates[32]) { // Space Up
+    if (keyStates[32] || keyStates[69]) { // Space / E Ascend
       noclipPosition[2] += speed;
-      moved = true;
     }
-    if (keyStates[16] || keyStates[67]) { // Shift / C Down
+    if (keyStates[67] || keyStates[17] || keyStates[81]) { // C / Ctrl / Q Descend
       noclipPosition[2] -= speed;
-      moved = true;
     }
 
-    if (moved) {
-      if (mp.local && typeof mp.local.spawnPlayer === 'function') {
-        mp.local.spawnPlayer(noclipPosition[0], noclipPosition[1], noclipPosition[2], 1.0);
-      }
+    // CRITICAL: Call spawnPlayer EVERY single tick to freeze gravity!
+    // This pins the player rock-solid in 3D mid-air when not moving, preventing freefall into the void.
+    if (mp.local && typeof mp.local.spawnPlayer === 'function') {
+      mp.local.spawnPlayer(noclipPosition[0], noclipPosition[1], noclipPosition[2], yaw);
     }
-  }, 25);
+  }, 20);
 }
 
 function setNoclip(state) {
   isNoclipActive = (state !== undefined) ? Boolean(state) : !isNoclipActive;
-  try {
-    const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
-    if (localPlayer && typeof localPlayer.setCollision === 'function') {
-      localPlayer.setCollision(!isNoclipActive);
-    }
-  } catch (err) {
-    console.log('[G-CyberRPcore] Noclip collision error:', err);
-  }
 
   if (isNoclipActive) {
     startNoclipFlight();
@@ -292,10 +293,21 @@ function setNoclip(state) {
       clearInterval(noclipInterval);
       noclipInterval = null;
     }
+    try {
+      const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
+      if (localPlayer) {
+        if (typeof localPlayer.setCollision === 'function') localPlayer.setCollision(true);
+      }
+      if (mp.local && typeof mp.local.spawnPlayer === 'function') {
+        mp.local.spawnPlayer(noclipPosition[0], noclipPosition[1], noclipPosition[2], 0.0);
+      }
+    } catch (err) {
+      console.log('[G-CyberRPcore] Noclip collision restore notice:', err);
+    }
   }
 
   if (mp.events && typeof mp.events.emitCef === 'function') {
-    mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/Shift.' : 'Disabled.', 'info');
+    mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/C (Shift = Sprint).' : 'Disabled. Gravity restored.', 'info');
   }
   console.log(`[G-CyberRPcore] Noclip state: ${isNoclipActive}`);
 }
@@ -327,36 +339,22 @@ function handleTeleport(args) {
 }
 
 function spawnAdminVehicle(modelKey) {
-  const recId = VEHICLE_RECORD_MAP[modelKey] || modelKey || 'Vehicle.v_sport1_quadra_turbo_r_player';
-  console.log(`[G-CyberRPcore] Spawning vehicle: ${modelKey} (${recId})`);
-  try {
-    const vehSys = mp.game.ScriptGameInstance.GetVehicleSystem();
-    if (vehSys) {
-      vehSys.EnablePlayerVehicle(recId, true, false);
-      vehSys.SpawnPlayerVehicle(0, recId, false);
-    }
-  } catch (e) {
-    console.log('[G-CyberRPcore] VehicleSystem spawn notice:', e);
-  }
+  console.log(`[G-CyberRPcore] Admin requesting vehicle: ${modelKey}`);
+  // Note: We deliberately do NOT call REDengine's offline single-player AI summoner (SpawnPlayerVehicle).
+  // The server instantiates the real synchronized, networked CyberMP vehicle via mp.vehicles.create!
   if (mp.events && typeof mp.events.emitServer === 'function') {
-    mp.events.emitServer('g-cyber:admin:spawnVehicle', recId);
+    mp.events.emitServer('g-cyber:admin:spawnVehicle', modelKey);
   }
   if (mp.events && typeof mp.events.emitCef === 'function') {
-    mp.events.emitCef('g-cyber:hud:notify', 'Vehicle Dispatched', `${modelKey} materialized near your position.`, 'success');
+    mp.events.emitCef('g-cyber:hud:notify', 'Vehicle Dispatched', `Materializing ${modelKey} via NetWatch transport...`, 'info');
   }
 }
 
 function handleAdminVehAction(action) {
   console.log(`[G-CyberRPcore] Vehicle Action: ${action}`);
   try {
-    const vehSys = mp.game.ScriptGameInstance.GetVehicleSystem();
     if (action === 'repair') {
       setHealth(SPAWN_HEALTH);
-    } else if (action === 'delete' && vehSys) {
-      const activeVeh = vehSys.GetActivePlayerVehicle();
-      if (activeVeh && activeVeh.recordID) {
-        vehSys.EnablePlayerVehicle(activeVeh.recordID, false, true);
-      }
     }
   } catch (e) {
     console.log('[G-CyberRPcore] vehAction notice:', e);
@@ -405,22 +403,61 @@ function handleAdminTime(hour) {
 }
 
 // =====================================================================
-// 4. Native Mirror & 3D Character Customization
+// 4. Native Character Customization & Mirror Systems
 // =====================================================================
 
-function openNativeMirror() {
-  console.log('[G-CyberRPcore] Opening native REDengine character customization mirror...');
+function openNativeCharacterCustomizer(scenarioType = 'MenuScenario_CharacterCustomization') {
+  console.log(`[G-CyberRPcore] Triggering native Cyberpunk 2077 character customizer (${scenarioType})...`);
   try {
     const uiSys = mp.game.ScriptGameInstance.GetUISystem();
     if (uiSys) {
-      uiSys.QueueMenuEvent("OnOpenMorphMenu");
-      if (mp.events && typeof mp.events.emitCef === 'function') {
-        mp.events.emitCef('g-cyber:hud:notify', 'Mirror Customizer', 'Connected to Cyberpunk 2077 biometric mirror.', 'success');
+      // 1. Queue switch event via inkMenuInstance_SwitchToScenario
+      try {
+        if (typeof mp.game.inkMenuInstance_SwitchToScenario === 'function') {
+          const switchEvt = new mp.game.inkMenuInstance_SwitchToScenario();
+          if (switchEvt && typeof switchEvt.Init === 'function') {
+            switchEvt.Init(scenarioType);
+            uiSys.QueueEvent(switchEvt);
+          }
+        }
+      } catch (e1) {
+        console.log('[G-CyberRPcore] inkMenuInstance_SwitchToScenario notice:', e1);
+      }
+
+      // 2. Queue menu scenario event directly
+      try {
+        if (typeof uiSys.QueueMenuEvent === 'function') {
+          uiSys.QueueMenuEvent(scenarioType);
+          uiSys.QueueMenuEvent("OnOpenMorphMenu");
+        }
+      } catch (e2) {
+        console.log('[G-CyberRPcore] QueueMenuEvent notice:', e2);
+      }
+
+      // 3. Initialize character customization system state if available
+      try {
+        const custSys = mp.game.ScriptGameInstance.GetCharacterCustomizationSystem();
+        if (custSys && typeof custSys.InitializeState === 'function') {
+          custSys.InitializeState();
+        }
+      } catch (e3) {
+        console.log('[G-CyberRPcore] custSys InitializeState notice:', e3);
       }
     }
+
+    // Release mouse and keyboard from CEF so the player interacts smoothly with native customizer
+    safeSetFocus(false, false);
+
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:hud:notify', '3D Customizer Active', 'Cyberpunk 2077 Native Character Customizer loaded.', 'success');
+    }
   } catch (err) {
-    console.log('[G-CyberRPcore] openNativeMirror notice:', err);
+    console.log('[G-CyberRPcore] openNativeCharacterCustomizer error:', err);
   }
+}
+
+function openNativeMirror() {
+  openNativeCharacterCustomizer('MenuScenario_CharacterCustomizationMirror');
 }
 
 function handleChar() {
@@ -510,6 +547,8 @@ registerCommand('car', (args) => spawnAdminVehicle(args && args[0]));
 registerCommand('veh', (args) => spawnAdminVehicle(args && args[0]));
 registerCommand('char', () => handleChar());
 registerCommand('multichar', () => handleChar());
+registerCommand('creator', () => openNativeCharacterCustomizer('MenuScenario_CharacterCustomization'));
+registerCommand('charcreator', () => openNativeCharacterCustomizer('MenuScenario_CharacterCustomization'));
 registerCommand('skin', () => handleSkin());
 registerCommand('clothing', () => handleSkin());
 registerCommand('mirror', () => openNativeMirror());
@@ -773,6 +812,10 @@ if (mp.events && typeof mp.events.onCef === 'function') {
   });
 
   // Character Creator Native Mirror & 3D Studio Controls
+  mp.events.onCef('g-cyber:creator:openNativeCreator', (scenario) => {
+    openNativeCharacterCustomizer(scenario || 'MenuScenario_CharacterCustomization');
+  });
+
   mp.events.onCef('g-cyber:creator:openNativeMirror', () => {
     openNativeMirror();
   });
@@ -804,6 +847,8 @@ if (mp.events && typeof mp.events.onCef === 'function') {
         setGodmode();
       } else if (cmd === 'char' || cmd === 'multichar') {
         handleChar();
+      } else if (cmd === 'creator' || cmd === 'charcreator') {
+        openNativeCharacterCustomizer('MenuScenario_CharacterCustomization');
       } else if (cmd === 'skin' || cmd === 'clothing') {
         handleSkin();
       } else if (cmd === 'mirror') {

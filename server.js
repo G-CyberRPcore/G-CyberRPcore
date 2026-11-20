@@ -304,28 +304,118 @@ mp.events.onClient('g-cyber:server:adminSelfAction', (player, action) => {
   }
 });
 
+// Helper: Resolve Vehicle Model Identifier to SharedVehicles key
+function resolveVehicleModelKey(input) {
+  if (!input) return 'quadra_turbo_r';
+  const clean = input.toLowerCase().replace(/[^a-z0-9_]/g, '');
+  const ALIAS_MAP = {
+    'quadraturbor': 'quadra_turbo_r',
+    'quadra': 'quadra_turbo_r',
+    'turbo': 'quadra_turbo_r',
+    'rayfieldcaliburn': 'rayfield_caliburn',
+    'caliburn': 'rayfield_caliburn',
+    'archnazare': 'arch_nazare',
+    'arch': 'arch_nazare',
+    'nazare': 'arch_nazare',
+    'policecruiser': 'ncpd_cruiser',
+    'police': 'ncpd_cruiser',
+    'cop': 'ncpd_cruiser',
+    'ncpd': 'ncpd_cruiser',
+    'ambulance': 'trauma_ambulance',
+    'trauma': 'trauma_ambulance',
+    'delamain': 'delamain_cab',
+    'delamaincab': 'delamain_cab',
+    'porsche': 'porsche_911',
+    'porsche911': 'porsche_911',
+    'shion': 'mizutani_shion',
+    'mizutani': 'mizutani_shion',
+    'hella': 'archer_hella',
+    'cortes': 'villefort_cortes',
+    'maimai': 'makigai_maimai',
+    'mackinaw': 'thorton_mackinaw',
+    'thrax': 'chevillon_thrax',
+    'kusanagi': 'yaiba_kusanagi',
+    'apollo': 'brennan_apollo'
+  };
+
+  if (ALIAS_MAP[clean]) return ALIAS_MAP[clean];
+  if (G_CyberCore.Shared && G_CyberCore.Shared.Vehicles) {
+    if (G_CyberCore.Shared.Vehicles[input]) return input;
+    if (G_CyberCore.Shared.Vehicles[clean]) return clean;
+    for (const [k, v] of Object.entries(G_CyberCore.Shared.Vehicles)) {
+      if (k.toLowerCase() === clean || k.toLowerCase().replace(/_/g, '') === clean || (v.model && v.model.toLowerCase().includes(clean))) {
+        return k;
+      }
+    }
+  }
+  return 'quadra_turbo_r';
+}
+
 // Vehicle Actions (Repair, Flip, Delete)
 mp.events.onClient('g-cyber:admin:vehAction', (player, action) => {
   if (!isPlayerAdmin(player)) return;
   console.log(`[Admin] Player ${player.id} executed vehicle action: ${action}`);
+
+  let targetVeh = player.vehicle;
+  if (!targetVeh && player.lastAdminVehicleId && mp.vehicles && mp.vehicles.exists(player.lastAdminVehicleId)) {
+    targetVeh = mp.vehicles.at(player.lastAdminVehicleId);
+  }
+
   if (action === 'repair') {
+    if (targetVeh) {
+      targetVeh.health = 1000;
+      if (typeof targetVeh.repair === 'function') targetVeh.repair();
+    }
     player.health = 100;
     player.emit('g-cyber:client:notify', 'Vehicle Repaired', 'Vehicle body and engine restored to 100%.', 'success');
   } else if (action === 'flip') {
+    if (targetVeh && targetVeh.position) {
+      targetVeh.position = [targetVeh.position[0], targetVeh.position[1], targetVeh.position[2] + 0.6];
+      targetVeh.rotation = [0, 0, targetVeh.yaw || 0];
+    }
     player.emit('g-cyber:client:notify', 'Vehicle Flipped', 'Vehicle re-oriented upright.', 'info');
   } else if (action === 'delete') {
+    if (targetVeh) {
+      G_CyberCore.Functions.DeleteVehicle(targetVeh.id);
+      player.lastAdminVehicleId = null;
+    }
     player.emit('g-cyber:client:notify', 'Vehicle Despawned', 'Active vehicle despawned.', 'warning');
   }
 });
 
 // Vehicle Spawning
-mp.events.onClient('g-cyber:admin:spawnVehicle', (player, modelKey) => {
+mp.events.onClient('g-cyber:admin:spawnVehicle', (player, rawModelKey) => {
   if (!isPlayerAdmin(player)) return;
-  const pPos = player.position || [0, 0, 0];
-  const spawnPos = [pPos[0] + 3.0, pPos[1] + 3.0, pPos[2]];
+  const targetKey = resolveVehicleModelKey(rawModelKey);
+  const vehData = (G_CyberCore.Shared && G_CyberCore.Shared.Vehicles) ? G_CyberCore.Shared.Vehicles[targetKey] : null;
 
-  console.log(`[Admin] Spawning vehicle ${modelKey} for player ${player.id} at [${spawnPos}]`);
-  player.emit('g-cyber:client:notify', 'Vehicle Dispatched', `${modelKey} materialized.`, 'success');
+  // Cleanup previously spawned admin vehicle to prevent duplicate clutter
+  if (player.lastAdminVehicleId && mp.vehicles && mp.vehicles.exists(player.lastAdminVehicleId)) {
+    try {
+      G_CyberCore.Functions.DeleteVehicle(player.lastAdminVehicleId);
+    } catch(e) {}
+  }
+
+  const pPos = (player.position && Array.isArray(player.position)) ? player.position : [DEFAULT_SPAWN[0], DEFAULT_SPAWN[1], DEFAULT_SPAWN[2]];
+  const yaw = player.yaw || 0.0;
+  const rad = (yaw * Math.PI) / 180.0;
+  // Place 4.5 meters in front of the player
+  const spawnPos = [
+    pPos[0] - Math.sin(rad) * 4.5,
+    pPos[1] + Math.cos(rad) * 4.5,
+    pPos[2] + 0.35
+  ];
+
+  console.log(`[Admin] Spawning networked vehicle ${targetKey} for player ${player.id} at [${spawnPos}]`);
+  const veh = G_CyberCore.Functions.CreateVehicle(targetKey, spawnPos, yaw, player.PlayerData ? player.PlayerData.citizenid : null);
+  if (veh) {
+    player.lastAdminVehicleId = veh.id;
+    const vehName = vehData ? vehData.name : targetKey;
+    player.emit('g-cyber:client:notify', 'Vehicle Materialized', `${vehName} dispatched in front of you.`, 'success');
+  } else {
+    console.error(`[Admin] Failed to spawn vehicle: ${rawModelKey}`);
+    player.emit('g-cyber:client:notify', 'Spawn Error', `Could not instantiate vehicle ${rawModelKey}.`, 'error');
+  }
 });
 
 // Weather & Time
