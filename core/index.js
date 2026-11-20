@@ -193,6 +193,10 @@ class G_CyberCoreEngine {
   }
 
   // --- ENTITY HELPERS ---
+  GetPlayers() {
+    return Array.from(this.onlinePlayers.values());
+  }
+
   GetPlayer(idOrPlayer) {
     if (typeof idOrPlayer === 'number') {
       return this.onlinePlayers.get(idOrPlayer) || null;

@@ -96,8 +96,11 @@ class Player {
       GetItemBySlot: (slot) => this.GetItemBySlot(slot),
       GetTotalWeight: () => this.GetTotalWeight(),
 
-      // Sync & Save
+      // Sync, Notify & Save
       UpdateHUD: () => this.SyncHUD(),
+      SyncHUD: () => this.SyncHUD(),
+      Notify: (title, message, type = 'info') => this.Notify(title, message, type),
+      SyncInventory: () => this.SyncInventory(),
       Save: () => this.Save()
     };
   }
