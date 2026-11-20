@@ -195,6 +195,35 @@ function setGodmode(state) {
   console.log(`[G-CyberRPcore] Godmode state: ${isGodmodeActive}`);
 }
 
+function applyNoclipPosition(pos) {
+  try {
+    const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    let handled = false;
+
+    // Method 1: TeleportPed directly sets (x, y, z) without altering camera or entity orientation
+    if (player && typeof player.TeleportPed === 'function') {
+      try {
+        player.TeleportPed({ x: pos[0], y: pos[1], z: pos[2] });
+        handled = true;
+      } catch (err) {}
+    }
+
+    // Method 2: Fallback to mp.local.spawnPlayer using the entity's native GetWorldYaw() (never atan2)
+    if (!handled && mp.local && typeof mp.local.spawnPlayer === 'function') {
+      let trueYaw = 0.0;
+      if (player && typeof player.GetWorldYaw === 'function') {
+        trueYaw = player.GetWorldYaw();
+      } else {
+        const localP = (mp.players && mp.players.local) ? mp.players.local : null;
+        if (localP && typeof localP.yaw === 'number') trueYaw = localP.yaw;
+      }
+      mp.local.spawnPlayer(pos[0], pos[1], pos[2], trueYaw);
+    }
+  } catch (e) {
+    console.log('[G-CyberRPcore] applyNoclipPosition error:', e);
+  }
+}
+
 function startNoclipFlight() {
   if (noclipInterval) clearInterval(noclipInterval);
   try {
@@ -228,7 +257,6 @@ function startNoclipFlight() {
     let forwardVec = [0, 1, 0];
     let rightVec = [1, 0, 0];
     let upVec = [0, 0, 1];
-    let yaw = 0.0;
 
     try {
       const camSys = mp.game.ScriptGameInstance.GetCameraSystem();
@@ -236,17 +264,14 @@ function startNoclipFlight() {
         const f = camSys.GetActiveCameraForward();
         const r = camSys.GetActiveCameraRight();
         const u = camSys.GetActiveCameraUp();
-        if (f) {
-          forwardVec = [f.x || 0, f.y || 0, f.z || 0];
-          yaw = Math.atan2(f.y, f.x) * (180 / Math.PI);
-        }
+        if (f) forwardVec = [f.x || 0, f.y || 0, f.z || 0];
         if (r) rightVec = [r.x || 0, r.y || 0, r.z || 0];
         if (u) upVec = [u.x || 0, u.y || 0, u.z || 0];
       }
     } catch (e) {}
 
     // Flight directional controls:
-    // W = 87 (Forward), S = 83 (Backward), D = 68 (Right), A = 65 (Left)
+    // W = 87 (Forward along camera gaze), S = 83 (Backward), D = 68 (Right), A = 65 (Left)
     // Space = 32 or E = 69 (Ascend), C = 67 or Ctrl = 17 or Q = 81 (Descend)
     if (keyStates[87]) { // W Forward
       noclipPosition[0] += forwardVec[0] * speed;
@@ -275,11 +300,8 @@ function startNoclipFlight() {
       noclipPosition[2] -= speed;
     }
 
-    // CRITICAL: Call spawnPlayer EVERY single tick to freeze gravity!
-    // This pins the player rock-solid in 3D mid-air when not moving, preventing freefall into the void.
-    if (mp.local && typeof mp.local.spawnPlayer === 'function') {
-      mp.local.spawnPlayer(noclipPosition[0], noclipPosition[1], noclipPosition[2], yaw);
-    }
+    // Apply 3D coordinate pinning without altering camera rotation
+    applyNoclipPosition(noclipPosition);
   }, 20);
 }
 
@@ -298,9 +320,7 @@ function setNoclip(state) {
       if (localPlayer) {
         if (typeof localPlayer.setCollision === 'function') localPlayer.setCollision(true);
       }
-      if (mp.local && typeof mp.local.spawnPlayer === 'function') {
-        mp.local.spawnPlayer(noclipPosition[0], noclipPosition[1], noclipPosition[2], 0.0);
-      }
+      applyNoclipPosition(noclipPosition);
     } catch (err) {
       console.log('[G-CyberRPcore] Noclip collision restore notice:', err);
     }
