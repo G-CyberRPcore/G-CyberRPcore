@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
       targetView.classList.add('active');
     }
     if (fullscreenBackdrop) {
-      if (targetView === viewLoading || targetView === viewMultichar || targetView === viewCreator) {
+      if (targetView === viewLoading || targetView === viewMultichar) {
         fullscreenBackdrop.classList.add('active');
       } else {
         fullscreenBackdrop.classList.remove('active');
@@ -508,18 +508,115 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('skin-tone').addEventListener('input', (e) => {
     document.getElementById('skin-tone-val').textContent = e.target.value;
     updateCreatorPreview();
+    emitCreatorPreview();
   });
   document.getElementById('skin-face').addEventListener('input', (e) => {
     document.getElementById('skin-face-val').textContent = e.target.value;
     updateCreatorPreview();
+    emitCreatorPreview();
   });
 
-  // Live Inputs
-  ['char-firstname', 'char-lastname', 'char-gender', 'skin-model', 'skin-eyes'].forEach(id => {
+  // Live Inputs & Clothing Change Listeners
+  ['char-firstname', 'char-lastname', 'char-gender', 'skin-model', 'skin-eyes', 'skin-hair', 'skin-haircolor', 'skin-cyberware', 'skin-tattoos', 'clothing-head', 'clothing-mask', 'clothing-jacket', 'clothing-pants'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('change', updateCreatorPreview);
-    if (el) el.addEventListener('input', updateCreatorPreview);
+    if (el) {
+      el.addEventListener('change', () => {
+        updateCreatorPreview();
+        emitCreatorPreview();
+      });
+      el.addEventListener('input', () => {
+        updateCreatorPreview();
+      });
+    }
   });
+
+  // Native Mirror Button
+  const btnOpenNativeMirror = document.getElementById('btn-open-native-mirror');
+  if (btnOpenNativeMirror) {
+    btnOpenNativeMirror.addEventListener('click', () => {
+      if (window.mp && mp.events) {
+        mp.events.emit('g-cyber:creator:openNativeMirror');
+      }
+      showToast('Native Mirror Studio', 'Connecting to REDengine biometric mirror...', 'info');
+    });
+  }
+
+  // 3D Character Rotation Controls
+  let currentYaw = 90.0;
+  const btnRotLeft = document.getElementById('btn-rotate-left');
+  const btnRotRight = document.getElementById('btn-rotate-right');
+  const btnRotFront = document.getElementById('btn-rotate-front');
+
+  if (btnRotLeft) {
+    btnRotLeft.addEventListener('click', () => {
+      currentYaw = (currentYaw + 30) % 360;
+      if (window.mp && mp.events) mp.events.emit('g-cyber:creator:rotateCharacter', currentYaw);
+    });
+  }
+  if (btnRotRight) {
+    btnRotRight.addEventListener('click', () => {
+      currentYaw = (currentYaw - 30 + 360) % 360;
+      if (window.mp && mp.events) mp.events.emit('g-cyber:creator:rotateCharacter', currentYaw);
+    });
+  }
+  if (btnRotFront) {
+    btnRotFront.addEventListener('click', () => {
+      currentYaw = 90.0;
+      if (window.mp && mp.events) mp.events.emit('g-cyber:creator:rotateCharacter', currentYaw);
+    });
+  }
+
+  // Preset Outfits
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const preset = btn.getAttribute('data-preset');
+      if (preset === 'streetwear') {
+        document.getElementById('clothing-jacket').value = 'samurai_leather';
+        document.getElementById('clothing-pants').value = 'reinforced_jeans';
+        document.getElementById('clothing-head').value = 'tactical_cap';
+        document.getElementById('clothing-mask').value = 'none';
+      } else if (preset === 'corpo') {
+        document.getElementById('clothing-jacket').value = 'corpo_trench';
+        document.getElementById('clothing-pants').value = 'corpo_slacks';
+        document.getElementById('clothing-head').value = 'tech_aviator';
+        document.getElementById('clothing-mask').value = 'none';
+      } else if (preset === 'nomad') {
+        document.getElementById('clothing-jacket').value = 'nomad_denim';
+        document.getElementById('clothing-pants').value = 'reinforced_jeans';
+        document.getElementById('clothing-head').value = 'none';
+        document.getElementById('clothing-mask').value = 'none';
+      } else if (preset === 'netrunner') {
+        document.getElementById('clothing-jacket').value = 'tactical_vest';
+        document.getElementById('clothing-pants').value = 'tactical_cargo';
+        document.getElementById('clothing-head').value = 'neural_visor';
+        document.getElementById('clothing-mask').value = 'oni_respirator';
+      }
+      updateCreatorPreview();
+      emitCreatorPreview();
+    });
+  });
+
+  function emitCreatorPreview() {
+    const previewData = {
+      model: document.getElementById('skin-model').value,
+      skinTone: document.getElementById('skin-tone').value,
+      face: document.getElementById('skin-face').value,
+      eyes: document.getElementById('skin-eyes').value,
+      hair: document.getElementById('skin-hair').value,
+      hairColor: document.getElementById('skin-haircolor').value,
+      cyberware: document.getElementById('skin-cyberware').value,
+      tattoos: document.getElementById('skin-tattoos').value,
+      headwear: document.getElementById('clothing-head').value,
+      mask: document.getElementById('clothing-mask').value,
+      jacket: document.getElementById('clothing-jacket').value,
+      pants: document.getElementById('clothing-pants').value
+    };
+    if (window.mp && mp.events) {
+      mp.events.emit('g-cyber:creator:previewChange', JSON.stringify(previewData));
+    }
+  }
 
   function updateCreatorPreview() {
     const fn = document.getElementById('char-firstname').value || 'Valerie';
@@ -528,10 +625,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const tone = document.getElementById('skin-tone').value;
     const eyes = document.getElementById('skin-eyes').options[document.getElementById('skin-eyes').selectedIndex].text;
 
-    document.getElementById('prev-name').textContent = `${fn} ${ln}`;
-    document.getElementById('prev-lifepath').textContent = selectedLifePath.toUpperCase();
-    document.getElementById('prev-genetics').textContent = `${model === 'female_v' ? 'Female V' : 'Male V'} // Tone #${tone}`;
-    document.getElementById('prev-eyes').textContent = eyes;
+    const elPrevName = document.getElementById('prev-name');
+    if (elPrevName) elPrevName.textContent = `${fn} ${ln}`;
+    const elPrevLp = document.getElementById('prev-lifepath');
+    if (elPrevLp) elPrevLp.textContent = selectedLifePath.toUpperCase();
+    const elPrevGen = document.getElementById('prev-genetics');
+    if (elPrevGen) elPrevGen.textContent = `${model === 'female_v' ? 'Female V' : 'Male V'} // Tone #${tone}`;
+    const elPrevEyes = document.getElementById('prev-eyes');
+    if (elPrevEyes) elPrevEyes.textContent = eyes;
+
+    // Viewport floating indicators
+    const elPillName = document.getElementById('prev-name-pill');
+    if (elPillName) elPillName.textContent = `${fn} ${ln}`;
+    const elPillLp = document.getElementById('prev-lifepath-pill');
+    if (elPillLp) elPillLp.textContent = selectedLifePath.toUpperCase();
+    const elPillModel = document.getElementById('prev-model-pill');
+    if (elPillModel) elPillModel.textContent = model === 'female_v' ? 'Female V' : 'Male V';
   }
 
   // Save New Character Button

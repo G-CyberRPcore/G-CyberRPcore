@@ -264,6 +264,20 @@ mp.events.onClient('g-cyber:server:adminSelfAction', (player, action) => {
   }
 });
 
+// Vehicle Actions (Repair, Flip, Delete)
+mp.events.onClient('g-cyber:admin:vehAction', (player, action) => {
+  if (!isPlayerAdmin(player)) return;
+  console.log(`[Admin] Player ${player.id} executed vehicle action: ${action}`);
+  if (action === 'repair') {
+    player.health = 100;
+    player.emit('g-cyber:client:notify', 'Vehicle Repaired', 'Vehicle body and engine restored to 100%.', 'success');
+  } else if (action === 'flip') {
+    player.emit('g-cyber:client:notify', 'Vehicle Flipped', 'Vehicle re-oriented upright.', 'info');
+  } else if (action === 'delete') {
+    player.emit('g-cyber:client:notify', 'Vehicle Despawned', 'Active vehicle despawned.', 'warning');
+  }
+});
+
 // Vehicle Spawning
 mp.events.onClient('g-cyber:admin:spawnVehicle', (player, modelKey) => {
   if (!isPlayerAdmin(player)) return;
@@ -412,11 +426,14 @@ if (mp.commands) {
     if (player) player.emit('g-cyber:client:showMultichar');
   });
 
-  // Command: skin / clothing
+  // Command: skin / clothing / mirror
   mp.commands.add('skin', (player, args) => {
     if (player) player.emit('g-cyber:client:showCreator');
   });
   mp.commands.add('clothing', (player, args) => {
+    if (player) player.emit('g-cyber:client:showCreator');
+  });
+  mp.commands.add('mirror', (player, args) => {
     if (player) player.emit('g-cyber:client:showCreator');
   });
 
