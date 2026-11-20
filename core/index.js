@@ -16,6 +16,10 @@ class G_CyberCoreEngine {
     this.onlinePlayers = new Map(); // id -> Player instance
     this.activeVehicles = new Map(); // vehId -> { plate, ownerCitizenId, modelKey }
 
+    this.Database = db;
+    this.Player = Player;
+    this.Players = this.onlinePlayers; // Map alias for compatibility
+
     this.Shared = {
       Items: SharedItems,
       Jobs: SharedJobs,
@@ -66,6 +70,14 @@ class G_CyberCoreEngine {
 
     this.registerLifecycleEvents();
     this.registerCoreCommands();
+  }
+
+  CreatePlayer(mpPlayer, charData) {
+    if (!mpPlayer) return null;
+    const playerObj = new Player(mpPlayer, charData || {});
+    this.onlinePlayers.set(mpPlayer.id, playerObj);
+    playerObj.Functions.Save();
+    return playerObj;
   }
 
   registerLifecycleEvents() {

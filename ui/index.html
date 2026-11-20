@@ -13,10 +13,12 @@
   <!-- Ambient Audio Element -->
   <audio id="bg-audio" src="audio/G-CyberRPcore-Loading.mp3" preload="auto" loop></audio>
 
-  <!-- Background Animated Cyber-Grid Canvas & Overlays -->
-  <canvas id="cyber-canvas"></canvas>
-  <div class="vignette-overlay"></div>
-  <div class="scanlines"></div>
+  <!-- Fullscreen Animated Cyber-Grid Backdrop (Active on Loading / Multichar / Creator) -->
+  <div id="fullscreen-backdrop" class="fullscreen-backdrop active">
+    <canvas id="cyber-canvas"></canvas>
+    <div class="vignette-overlay"></div>
+    <div class="scanlines"></div>
+  </div>
 
   <!-- Notification & Toast Stream -->
   <div id="toast-container" class="toast-container"></div>

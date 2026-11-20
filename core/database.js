@@ -69,6 +69,26 @@ class DatabaseEngine {
     return null;
   }
 
+  GetCharactersForPlayer(playerKey, playerId) {
+    const list = [];
+    for (const [cid, data] of this.players.entries()) {
+      if (!data) continue;
+      if (data.ownerKey === playerKey || data.name === playerKey || (playerId !== undefined && data.id === playerId)) {
+        list.push(data);
+      }
+    }
+    return list;
+  }
+
+  DeletePlayer(citizenid) {
+    if (this.players.has(citizenid)) {
+      this.players.delete(citizenid);
+      this.persist(PLAYERS_FILE, this.players);
+      return true;
+    }
+    return false;
+  }
+
   // --- VEHICLES API ---
   SaveVehicle(plate, data) {
     if (!plate) return;

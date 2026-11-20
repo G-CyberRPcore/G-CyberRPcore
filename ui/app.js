@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const viewCreator = document.getElementById('view-creator');
   const viewHud = document.getElementById('view-hud');
   const viewAdmin = document.getElementById('view-admin');
+  const fullscreenBackdrop = document.getElementById('fullscreen-backdrop');
 
   // Request CEF input focus immediately so mouse cursor and keyboard work
   if (window.mp && mp.events) {
@@ -26,6 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (targetView) {
       targetView.classList.add('active');
+    }
+    if (fullscreenBackdrop) {
+      if (targetView === viewLoading || targetView === viewMultichar || targetView === viewCreator) {
+        fullscreenBackdrop.classList.add('active');
+      } else {
+        fullscreenBackdrop.classList.remove('active');
+      }
     }
   }
 
@@ -423,6 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function selectAndSpawnCharacter(char) {
     if (window.mp && mp.events) {
       mp.events.emit('g-cyber:characters:select', char.citizenid);
+      mp.events.emit('g-cyber:ui:setFocus', false);
     }
     showToast('Neural Connection Established', `Welcome back, ${char.charinfo.firstname}. Spawning into Night City...`, 'success');
     showView(viewHud);
@@ -555,6 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (window.mp && mp.events) {
       mp.events.emit('g-cyber:characters:create', JSON.stringify(newCitizenData));
+      mp.events.emit('g-cyber:ui:setFocus', false);
     }
 
     showToast('Identity Initialized!', `Welcome to Night City, ${newCitizenData.charinfo.firstname}. Spawning...`, 'success');
@@ -880,6 +890,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // =====================================================================
   if (window.mp && mp.events) {
     mp.events.on('g-cyber:ui:showLoading', () => showView(viewLoading));
+    mp.events.on('g-cyber:ui:characterSpawned', (charJson) => {
+      try {
+        const char = (typeof charJson === 'string') ? JSON.parse(charJson) : charJson;
+        showView(viewHud);
+        updateHUDFromCharacter(char);
+      } catch (e) {
+        showView(viewHud);
+      }
+    });
     mp.events.on('g-cyber:ui:handleEscape', () => {
       if (viewLoading && viewLoading.classList.contains('active')) {
         skipLoadingAndPlay();

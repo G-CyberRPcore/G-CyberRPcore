@@ -6,11 +6,31 @@
 
 console.log('[G-CyberRPcore] Master Client Subsystem Initializing...');
 
+// Mount Master CEF URL immediately at top-level
+if (mp.cef && typeof mp.cef.setUrl === 'function') {
+  try {
+    mp.cef.setUrl('./ui/index.html');
+  } catch (err) {
+    console.log('[G-CyberRPcore] mp.cef.setUrl notice:', err);
+  }
+}
+
 let isNoclipActive = false;
 let isGodmodeActive = false;
 let isSeatbeltActive = false;
 let isAdminMenuActive = false;
 let isSpawned = false;
+
+// Safe focus helper
+function safeSetFocus(keyboard, mouse) {
+  try {
+    if (mp.cef && typeof mp.cef.setFocus === 'function') {
+      mp.cef.setFocus(Boolean(keyboard), Boolean(mouse));
+    }
+  } catch (err) {
+    console.log('[G-CyberRPcore] safeSetFocus notice:', err);
+  }
+}
 
 // REDengine Stat Pool & Stat Type Constants (Official CyberMP Spec)
 const HEALTH_STAT_POOL_TYPE = 17;
@@ -101,9 +121,7 @@ function spawnPlayer(x = -1392.637, y = 1271.536, z = 123.082, yaw = 1.0) {
 
 function toggleAdminMenu(forceState) {
   isAdminMenuActive = (forceState !== undefined) ? forceState : !isAdminMenuActive;
-  if (mp.cef && typeof mp.cef.setFocus === 'function') {
-    mp.cef.setFocus(isAdminMenuActive, isAdminMenuActive);
-  }
+  safeSetFocus(isAdminMenuActive, isAdminMenuActive);
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('g-cyber:ui:toggleAdmin', isAdminMenuActive);
   }
@@ -112,9 +130,7 @@ function toggleAdminMenu(forceState) {
 
 function openChat() {
   if (isAdminMenuActive) return;
-  if (mp.cef && typeof mp.cef.setFocus === 'function') {
-    mp.cef.setFocus(true, true);
-  }
+  safeSetFocus(true, true);
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('chat:open');
   }
@@ -175,8 +191,9 @@ function handleSpawnVehicle(args) {
 }
 
 function handleChar() {
-  if (mp.cef && typeof mp.cef.setFocus === 'function') {
-    mp.cef.setFocus(true, true);
+  safeSetFocus(true, true);
+  if (mp.events && typeof mp.events.emitCef === 'function') {
+    mp.events.emitCef('g-cyber:ui:showMulticharacter');
   }
   if (mp.events && typeof mp.events.emitServer === 'function') {
     mp.events.emitServer('g-cyber:server:requestCharacters');
@@ -184,9 +201,7 @@ function handleChar() {
 }
 
 function handleSkin() {
-  if (mp.cef && typeof mp.cef.setFocus === 'function') {
-    mp.cef.setFocus(true, true);
-  }
+  safeSetFocus(true, true);
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('g-cyber:ui:showCreator', 1);
   }
@@ -230,25 +245,20 @@ registerCommand('ping', () => {
   }
 });
 registerCommand('loading', () => {
-  if (mp.cef && typeof mp.cef.setFocus === 'function') {
-    mp.cef.setFocus(true, true);
-  }
+  safeSetFocus(true, true);
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('g-cyber:ui:showLoading');
   }
 });
 registerCommand('spawn', () => {
   spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+  safeSetFocus(false, false);
 });
 registerCommand('ui', () => {
-  if (mp.cef && typeof mp.cef.setFocus === 'function') {
-    mp.cef.setFocus(true, true);
-  }
+  safeSetFocus(true, true);
 });
 registerCommand('closeui', () => {
-  if (mp.cef && typeof mp.cef.setFocus === 'function') {
-    mp.cef.setFocus(false, false);
-  }
+  safeSetFocus(false, false);
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('g-cyber:ui:closeAll');
   }
@@ -258,18 +268,14 @@ registerCommand('closeui', () => {
 // 4. Official Engine Lifecycle Hooks (onInit & onceGameLoaded)
 // =====================================================================
 
-// Stage 1: Resource Start - Prepare CEF URL and enable interactive input focus
+// Stage 1: Resource Start
 if (mp.events && typeof mp.events.on === 'function') {
   mp.events.on('resourceStart', () => {
-    console.log('[G-CyberRPcore] resourceStart: Mounting Master CEF view and enabling focus...');
-    if (mp.cef) {
-      if (typeof mp.cef.setUrl === 'function') mp.cef.setUrl('./ui/index.html');
-      if (typeof mp.cef.setFocus === 'function') mp.cef.setFocus(true, true);
-    }
+    console.log('[G-CyberRPcore] resourceStart: Framework client resource mounted.');
   });
 }
 
-// Stage 2: onInit - Bind Native Keys (F10 Admin, T Chat, B Seatbelt)
+// Stage 2: onInit - Bind Native Keys (F10 Admin, T Chat, B Seatbelt, ESC Menu)
 try {
   if (mp.game && typeof mp.game.onInit === 'function') {
     mp.game.onInit(() => {
@@ -302,19 +308,12 @@ try {
   console.log('[G-CyberRPcore] onInit setup notice:', e);
 }
 
-// Stage 3: onceGameLoaded & onGameLoaded - World Ready (Safe for spawnPlayer)
+// Stage 3: onceGameLoaded & onGameLoaded - World Ready
 function handleWorldReady() {
-  if (isSpawned) return;
-  console.log('[G-CyberRPcore] World loaded! Spawning player puppet at Megabuilding H10...');
-  spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
-
-  // Mount Master UI & Show Loading/Multicharacter
-  if (mp.cef) {
-    if (typeof mp.cef.setUrl === 'function') mp.cef.setUrl('./ui/index.html');
-    if (typeof mp.cef.setFocus === 'function') mp.cef.setFocus(true, true);
-  }
-  if (mp.events && typeof mp.events.emitCef === 'function') {
-    mp.events.emitCef('g-cyber:ui:showLoading');
+  console.log('[G-CyberRPcore] World loaded! Game environment ready.');
+  // If player skipped or already has an active character, spawn
+  if (isSpawned) {
+    spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
   }
 }
 
@@ -334,17 +333,6 @@ try {
   console.log('[G-CyberRPcore] onGameLoaded hook notice:', e);
 }
 
-// Fallback: If game is already loaded upon script hot-reload
-setTimeout(() => {
-  if (!isSpawned && mp.game && typeof mp.game.GetPlayer === 'function') {
-    const p = mp.game.GetPlayer();
-    if (p) {
-      console.log('[G-CyberRPcore] Post-load fallback: Player instance exists. Executing spawn...');
-      handleWorldReady();
-    }
-  }
-}, 3000);
-
 // =====================================================================
 // 5. CEF Browser Lifecycle & Event Handlers
 // =====================================================================
@@ -352,23 +340,17 @@ setTimeout(() => {
 if (mp.events && typeof mp.events.onCef === 'function') {
   mp.events.onCef('domReady', (name) => {
     console.log('[G-CyberRPcore] CEF DOM ready:', name);
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(true, true);
-    }
+    safeSetFocus(true, true);
     mp.events.emitCef('g-cyber:ui:showLoading');
   });
 
   mp.events.onCef('g-cyber:ui:setFocus', (state) => {
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(Boolean(state), Boolean(state));
-    }
+    safeSetFocus(state, state);
   });
 
   mp.events.onCef('g-cyber:loading:close', () => {
     console.log('[G-CyberRPcore] Loading screen closed. Releasing input focus to game.');
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(false, false);
-    }
+    safeSetFocus(false, false);
     if (!isSpawned) {
       spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
     }
@@ -376,9 +358,7 @@ if (mp.events && typeof mp.events.onCef === 'function') {
 
   mp.events.onCef('g-cyber:loading:finish', () => {
     console.log('[G-CyberRPcore] Loading screen finished. Requesting character roster...');
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(true, true);
-    }
+    safeSetFocus(true, true);
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('g-cyber:server:requestCharacters');
     }
@@ -391,18 +371,14 @@ if (mp.events && typeof mp.events.onCef === 'function') {
   });
 
   mp.events.onCef('g-cyber:characters:select', (citizenid) => {
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(false, false);
-    }
+    console.log('[G-CyberRPcore] Character selected:', citizenid);
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('g-cyber:server:selectCharacter', citizenid);
     }
   });
 
   mp.events.onCef('g-cyber:characters:create', (characterJson) => {
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(false, false);
-    }
+    console.log('[G-CyberRPcore] Creating character...');
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('g-cyber:server:createCharacter', characterJson);
     }
@@ -414,48 +390,52 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     }
   });
 
-  mp.events.onCef('chat:focus', (state) => {
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(state, state);
-    }
-  });
-
-  mp.events.onCef('chat:submit', (text) => {
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(false, false);
-    }
-    if (!text) return;
-    if (text.startsWith('/')) {
-      const parts = text.slice(1).trim().split(/\s+/);
-      const cmd = parts[0].toLowerCase();
-      const args = parts.slice(1);
-
-      if (cmd === 'admin' || cmd === 'adminmenu' || cmd === 'a' || cmd === 'hub') {
-        toggleAdminMenu();
-      } else if (cmd === 'noclip') {
-        toggleNoclip();
-      } else if (cmd === 'god') {
-        toggleGodmode();
-      } else if (cmd === 'clothing' || cmd === 'skin') {
-        handleSkin();
-      } else if (cmd === 'char' || cmd === 'multichar') {
-        handleChar();
-      } else {
-        if (mp.events && typeof mp.events.emitServer === 'function') {
-          mp.events.emitServer('chat:command', cmd, args);
-        }
-      }
-    } else {
-      if (mp.events && typeof mp.events.emitServer === 'function') {
-        mp.events.emitServer('chat:message', text);
-      }
-    }
-  });
-
   mp.events.onCef('admin:focus', (state) => {
-    isAdminMenuActive = state;
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(state, state);
+    safeSetFocus(state, state);
+  });
+
+  mp.events.onCef('admin:teleport', (x, y, z) => {
+    spawnPlayer(x, y, z, 1.0);
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:admin:teleportCoords', x, y, z);
+    }
+  });
+
+  mp.events.onCef('admin:spawnCar', (model) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:admin:spawnVehicle', model);
+    }
+  });
+
+  mp.events.onCef('admin:weather', (weather) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:admin:setWeather', weather);
+    }
+  });
+
+  mp.events.onCef('admin:time', (hour) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:admin:setTime', hour);
+    }
+  });
+
+  mp.events.onCef('admin:playerAction', (action, targetId) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:server:adminPlayerAction', action, targetId);
+    }
+  });
+
+  mp.events.onCef('admin:selfAction', (action) => {
+    if (action === 'god') toggleGodmode();
+    else if (action === 'noclip') toggleNoclip();
+    else if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:server:adminSelfAction', action);
+    }
+  });
+
+  mp.events.onCef('admin:broadcast', (text) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:admin:broadcast', text);
     }
   });
 
@@ -465,79 +445,54 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     }
   });
 
-  mp.events.onCef('g-cyber:admin:playerAction', (action, targetId) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:server:adminPlayerAction', action, targetId);
-    }
-  });
-
-  mp.events.onCef('g-cyber:admin:toggleSelf', (feature, state) => {
-    if (feature === 'godmode') isGodmodeActive = state;
-    if (feature === 'noclip') toggleNoclip();
-  });
-
-  mp.events.onCef('g-cyber:admin:selfAction', (action) => {
-    const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
-    if (localPlayer && action === 'heal') localPlayer.health = 100;
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:server:adminSelfAction', action);
-    }
-  });
-
-  mp.events.onCef('g-cyber:admin:teleportDistrict', (district) => {
-    if (DISTRICT_COORDS[district]) {
-      const coords = DISTRICT_COORDS[district];
-      spawnPlayer(coords[0], coords[1], coords[2], 1.0);
+  // Chat CEF Events
+  mp.events.onCef('chatSubmit', (text) => {
+    safeSetFocus(false, false);
+    if (!text || text.trim().length === 0) return;
+    if (text.startsWith('/')) {
+      const parts = text.slice(1).trim().split(/\s+/);
+      const cmd = parts[0].toLowerCase();
+      const args = parts.slice(1);
+      if (cmd === 'admin' || cmd === 'a' || cmd === 'hub') {
+        toggleAdminMenu();
+      } else if (cmd === 'noclip') {
+        toggleNoclip();
+      } else if (cmd === 'god') {
+        toggleGodmode();
+      } else if (cmd === 'char') {
+        handleChar();
+      } else if (cmd === 'skin') {
+        handleSkin();
+      } else if (cmd === 'tp') {
+        handleTeleport(args);
+      } else if (cmd === 'car' || cmd === 'veh') {
+        handleSpawnVehicle(args);
+      } else if (cmd === 'closeui') {
+        safeSetFocus(false, false);
+        mp.events.emitCef('g-cyber:ui:closeAll');
+      } else if (mp.events && typeof mp.events.emitServer === 'function') {
+        mp.events.emitServer('chat:command', cmd, args);
+      }
+    } else {
       if (mp.events && typeof mp.events.emitServer === 'function') {
-        mp.events.emitServer('g-cyber:admin:teleportCoords', coords[0], coords[1], coords[2]);
-      }
-      if (mp.events && typeof mp.events.emitCef === 'function') {
-        mp.events.emitCef('g-cyber:hud:notify', 'Teleport', `Arrived in ${district.replace('_', ' ').toUpperCase()}`, 'success');
+        mp.events.emitServer('chat:message', text);
       }
     }
   });
 
-  mp.events.onCef('g-cyber:admin:spawnVehicle', (model) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:spawnVehicle', model);
-    }
-  });
-
-  mp.events.onCef('g-cyber:admin:vehAction', (action) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:vehicleAction', action);
-    }
-  });
-
-  mp.events.onCef('g-cyber:admin:setWeather', (weather) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:setWeather', weather);
-    }
-  });
-
-  mp.events.onCef('g-cyber:admin:setTime', (time) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:setTime', time);
-    }
-  });
-
-  mp.events.onCef('g-cyber:admin:broadcast', (text) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:broadcast', text);
-    }
+  mp.events.onCef('chatClose', () => {
+    safeSetFocus(false, false);
   });
 }
 
 // =====================================================================
-// 6. Server Event Receivers (F8 Console & Server Dispatches)
+// 6. Server Event Handlers
 // =====================================================================
 
 if (mp.events && typeof mp.events.onServer === 'function') {
   mp.events.onServer('g-cyber:client:toggleAdmin', () => toggleAdminMenu());
   mp.events.onServer('g-cyber:client:closeUI', () => {
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(false, false);
-    }
+    safeSetFocus(false, false);
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('g-cyber:ui:closeAll');
     }
@@ -545,99 +500,56 @@ if (mp.events && typeof mp.events.onServer === 'function') {
   mp.events.onServer('g-cyber:client:toggleNoclip', () => toggleNoclip());
   mp.events.onServer('g-cyber:client:toggleGod', () => toggleGodmode());
   mp.events.onServer('g-cyber:client:showCreator', () => handleSkin());
-  mp.events.onServer('g-cyber:client:teleportCommand', (args) => handleTeleport(args));
+  mp.events.onServer('g-cyber:client:showMultichar', () => handleChar());
   mp.events.onServer('g-cyber:client:respawn', () => {
     spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+    safeSetFocus(false, false);
   });
 
-  mp.events.onServer('g-cyber:client:startRoster', () => {
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(true, true);
-    }
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:server:requestCharacters');
+  mp.events.onServer('g-cyber:client:teleportCommand', (args) => {
+    handleTeleport(args);
+  });
+
+  mp.events.onServer('g-cyber:client:characterLoaded', (charJson) => {
+    console.log('[G-CyberRPcore] Character successfully loaded from server. Spawning...');
+    spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+    safeSetFocus(false, false);
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:ui:characterSpawned', charJson);
     }
   });
 
   mp.events.onServer('g-cyber:client:receiveCharacters', (charsJson) => {
-    if (mp.cef && typeof mp.cef.setFocus === 'function') {
-      mp.cef.setFocus(true, true);
-    }
+    console.log('[G-CyberRPcore] Received character slots from server.');
+    safeSetFocus(true, true);
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('g-cyber:ui:showMulticharacter', charsJson);
     }
   });
 
-  mp.events.onServer('g-cyber:client:syncHUD', (data) => {
+  mp.events.onServer('g-cyber:client:receiveAdminData', (listJson) => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
-      mp.events.emitCef('g-cyber:hud:sync', data);
-    }
-  });
-
-  mp.events.onServer('g-cyber:client:notify', (title, message, type) => {
-    if (mp.events && typeof mp.events.emitCef === 'function') {
-      mp.events.emitCef('g-cyber:hud:notify', title, message, type);
+      mp.events.emitCef('g-cyber:ui:receiveAdminData', listJson);
     }
   });
 
   mp.events.onServer('g-cyber:client:adminBroadcast', (text) => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
-      mp.events.emitCef('g-cyber:admin:broadcast', text);
+      mp.events.emitCef('g-cyber:ui:broadcast', text);
     }
   });
 
-  mp.events.onServer('g-cyber:client:receiveAdminData', (playersJson) => {
+  mp.events.onServer('g-cyber:client:notify', (title, msg, type) => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
-      mp.events.emitCef('g-cyber:admin:updatePlayers', playersJson);
+      mp.events.emitCef('g-cyber:hud:notify', title, msg, type);
     }
   });
 
-  mp.events.onServer('chat:add', (text, type) => {
+  mp.events.onServer('chat:add', (text, type = 'normal') => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('chat:addMessage', text, type);
     }
   });
 }
-
-// Telemetry & Speedometer Sync Loop (100ms)
-setInterval(() => {
-  const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
-  if (!localPlayer) return;
-
-  // Send Coordinates to Admin Menu
-  if (isAdminMenuActive && localPlayer.position && mp.events && typeof mp.events.emitCef === 'function') {
-    const p = localPlayer.position;
-    const coordsStr = `X: ${p[0].toFixed(2)} | Y: ${p[1].toFixed(2)} | Z: ${p[2].toFixed(2)}`;
-    mp.events.emitCef('g-cyber:admin:updateCoords', coordsStr);
-  }
-
-  // Vehicle Telemetry
-  if (localPlayer.vehicle && localPlayer.vehicle.id !== 0 && mp.events && typeof mp.events.emitCef === 'function') {
-    const veh = localPlayer.vehicle;
-    const vel = veh.velocity || [0, 0, 0];
-    const speed = Math.sqrt(vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]) * 3.6;
-
-    let gear = '1';
-    if (speed > 160) gear = '6';
-    else if (speed > 120) gear = '5';
-    else if (speed > 80) gear = '4';
-    else if (speed > 50) gear = '3';
-    else if (speed > 25) gear = '2';
-    else if (speed < 1) gear = 'P';
-
-    const rpm = Math.min(100, (speed % 40) * 2.5 + 20);
-
-    mp.events.emitCef('g-cyber:hud:vehicle', {
-      inVehicle: true,
-      speed: speed,
-      gear: gear,
-      rpm: rpm,
-      seatbelt: isSeatbeltActive
-    });
-  } else if (mp.events && typeof mp.events.emitCef === 'function') {
-    isSeatbeltActive = false;
-    mp.events.emitCef('g-cyber:hud:vehicle', { inVehicle: false });
-  }
-}, 100);
 
 console.log('[G-CyberRPcore] Master Client Subsystem Ready.');
