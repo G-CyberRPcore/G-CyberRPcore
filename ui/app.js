@@ -530,6 +530,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Native Original Character Creator Button
+  const btnOpenOriginalCreator = document.getElementById('btn-open-original-creator');
+  if (btnOpenOriginalCreator) {
+    btnOpenOriginalCreator.addEventListener('click', () => {
+      if (window.mp && mp.events) {
+        mp.events.emit('g-cyber:creator:openNativeCreator', 'MenuScenario_CharacterCustomization');
+      }
+      showToast('3D Character Customizer', 'Launching Cyberpunk 2077 original character creator...', 'success');
+    });
+  }
+
   // Native Mirror Button
   const btnOpenNativeMirror = document.getElementById('btn-open-native-mirror');
   if (btnOpenNativeMirror) {
