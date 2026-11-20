@@ -400,6 +400,17 @@
           <h2>CHARACTER INITIALIZATION // BIOMETRIC SETUP</h2>
         </header>
 
+        <!-- Native Mirror Studio Launcher -->
+        <div class="native-mirror-box">
+          <button type="button" class="btn-open-native-mirror" id="btn-open-native-mirror">
+            <span class="mirror-icon">🪞</span>
+            <div class="mirror-btn-text">
+              <strong>ENTER NATIVE 3D MIRROR STUDIO</strong>
+              <span>Launch Cyberpunk 2077 mirror creator (face morphs, cyberware, hair, scars)</span>
+            </div>
+          </button>
+        </div>
+
         <nav class="creator-nav">
           <button class="creator-nav-btn active" data-step="step-identity">1. IDENTITY</button>
           <button class="creator-nav-btn" data-step="step-genetics">2. GENETICS</button>
@@ -591,47 +602,42 @@
         </footer>
       </div>
 
-      <!-- Right Panel: Live Citizen Hologram Card -->
-      <div class="creator-preview-panel">
-        <div class="holo-card">
-          <div class="holo-header">
-            <span class="holo-code">NC-CITIZEN-SCAN</span>
-            <span class="holo-status text-green">LIVE</span>
+      <!-- Right Viewport: Live 3D Puppet Camera Controls -->
+      <div class="creator-3d-viewport-controls">
+        <div class="studio-status-badge">
+          <span class="live-dot">●</span> 3D CHARACTER STUDIO PREVIEW
+        </div>
+
+        <div class="camera-rotate-box">
+          <div class="camera-rotate-label">3D PUPPET ROTATION</div>
+          <div class="camera-rotate-bar">
+            <button type="button" class="btn-cam-control" id="btn-rotate-left" title="Rotate Character Left">↺ ROTATE LEFT</button>
+            <button type="button" class="btn-cam-control" id="btn-rotate-front" title="Front View">◉ FRONT</button>
+            <button type="button" class="btn-cam-control" id="btn-rotate-right" title="Rotate Character Right">↻ ROTATE RIGHT</button>
           </div>
-          <div class="holo-avatar-box">
-            <div class="avatar-ring"></div>
-            <div class="holo-silhouette">👤</div>
+        </div>
+
+        <div class="creator-info-pill">
+          <div class="pill-row">
+            <span class="pill-label">IDENTITY:</span>
+            <span class="pill-val" id="prev-name-pill">Valerie Street</span>
           </div>
-          <div class="holo-details">
-            <div class="detail-row">
-              <span class="detail-label">CITIZEN NAME:</span>
-              <span class="detail-val" id="prev-name">Valerie Street</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">LIFE PATH:</span>
-              <span class="detail-val text-yellow" id="prev-lifepath">STREETKID</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">GENETICS:</span>
-              <span class="detail-val" id="prev-genetics">Female V // Skin #3</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">OPTIC IMPLANT:</span>
-              <span class="detail-val text-cyan" id="prev-eyes">Kiroshi Neon Cyan</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">STARTING CASH:</span>
-              <span class="detail-val text-green">$1,500</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">STARTING BANK:</span>
-              <span class="detail-val text-green">$10,000</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">APARTMENT:</span>
-              <span class="detail-val">Megabuilding H10, Watson</span>
-            </div>
+          <div class="pill-row">
+            <span class="pill-label">LIFEPATH:</span>
+            <span class="pill-val text-yellow" id="prev-lifepath-pill">STREETKID</span>
           </div>
+          <div class="pill-row">
+            <span class="pill-label">ARCHETYPE:</span>
+            <span class="pill-val text-cyan" id="prev-model-pill">Female V</span>
+          </div>
+        </div>
+
+        <!-- Hidden elements for legacy ID compatibility -->
+        <div style="display:none;">
+          <span id="prev-name"></span>
+          <span id="prev-lifepath"></span>
+          <span id="prev-genetics"></span>
+          <span id="prev-eyes"></span>
         </div>
       </div>
     </div>

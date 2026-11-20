@@ -23,5 +23,8 @@
   "bugs": {
     "url": "https://github.com/G-CyberRPcore/G-CyberRPcore/issues"
   },
-  "homepage": "https://github.com/G-CyberRPcore"
+  "homepage": "https://github.com/G-CyberRPcore",
+  "devDependencies": {
+    "@cybermp-community/client-types": "^2.6.1"
+  }
 }

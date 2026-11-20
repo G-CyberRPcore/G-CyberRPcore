@@ -21,6 +21,15 @@ let isSeatbeltActive = false;
 let isAdminMenuActive = false;
 let isSpawned = false;
 
+// Creator studio coordinates (Megabuilding H10 Mirror Studio)
+const CREATOR_STUDIO_COORDS = [-1385.2, 1272.8, 124.0, 90.0];
+let currentCreatorYaw = 90.0;
+
+// Noclip state & keys
+let noclipPosition = [-1392.637, 1271.536, 123.082];
+let noclipInterval = null;
+const keyStates = {};
+
 // Safe focus helper
 function safeSetFocus(keyboard, mouse) {
   try {
@@ -49,8 +58,17 @@ const DISTRICT_COORDS = {
   arasaka_roof: [-150.0, -600.0, 210.0]
 };
 
+// Vehicle Record Map
+const VEHICLE_RECORD_MAP = {
+  'QuadraTurboR': 'Vehicle.v_sport1_quadra_turbo_r_player',
+  'RayfieldCaliburn': 'Vehicle.v_sport1_rayfield_caliburn_player',
+  'ArchNazare': 'Vehicle.v_sportbike2_arch_player',
+  'PoliceCruiser': 'Vehicle.v_standard2_villefort_cortes_police',
+  'Ambulance': 'Vehicle.v_standard25_thorton_colby_pickup_player'
+};
+
 // =====================================================================
-// 1. Health Pool Setup & Player Spawning (spawning-player.mdx)
+// 1. Health Pool Setup & Player Spawning
 // =====================================================================
 
 function setHealth(value) {
@@ -136,31 +154,150 @@ function openChat() {
   }
 }
 
-function toggleNoclip() {
-  isNoclipActive = !isNoclipActive;
-  const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
-  if (localPlayer && typeof localPlayer.setCollision === 'function') {
-    localPlayer.setCollision(!isNoclipActive);
-  }
-  if (mp.events && typeof mp.events.emitCef === 'function') {
-    mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/Shift.' : 'Disabled.', 'info');
-  }
-  console.log(`[G-CyberRPcore] Noclip toggled: ${isNoclipActive}`);
-}
-
-function toggleGodmode() {
-  isGodmodeActive = !isGodmodeActive;
-  if (mp.events && typeof mp.events.emitCef === 'function') {
-    mp.events.emitCef('g-cyber:hud:notify', 'Godmode', isGodmodeActive ? 'Invincibility enabled.' : 'Invincibility disabled.', 'info');
-  }
-  console.log(`[G-CyberRPcore] Godmode toggled: ${isGodmodeActive}`);
-}
-
 function handleSeatbelt() {
   isSeatbeltActive = !isSeatbeltActive;
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('g-cyber:hud:notify', 'Seatbelt', isSeatbeltActive ? 'Buckled.' : 'Unbuckled!', isSeatbeltActive ? 'success' : 'warning');
   }
+}
+
+// =====================================================================
+// 3. Functional Admin Implementations (Godmode, Noclip, Spawning)
+// =====================================================================
+
+function setGodmode(state) {
+  isGodmodeActive = (state !== undefined) ? Boolean(state) : !isGodmodeActive;
+  try {
+    const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    if (player) {
+      const entId = player.GetEntityID();
+      const godModeSys = mp.game.ScriptGameInstance.GetGodModeSystem();
+      if (godModeSys) {
+        if (isGodmodeActive) {
+          godModeSys.AddGodMode(entId, 0, 'admin'); // Invulnerable
+          godModeSys.AddGodMode(entId, 1, 'admin'); // Immortal
+          setMaxHealth(99999);
+          setHealth(99999);
+        } else {
+          godModeSys.ClearGodMode(entId, 'admin');
+          setMaxHealth(SPAWN_HEALTH);
+          setHealth(SPAWN_HEALTH);
+        }
+      }
+    }
+  } catch (err) {
+    console.log('[G-CyberRPcore] Godmode execution error:', err);
+  }
+
+  if (mp.events && typeof mp.events.emitCef === 'function') {
+    mp.events.emitCef('g-cyber:hud:notify', 'Godmode', isGodmodeActive ? 'Invincibility enabled.' : 'Invincibility disabled.', 'info');
+  }
+  console.log(`[G-CyberRPcore] Godmode state: ${isGodmodeActive}`);
+}
+
+function startNoclipFlight() {
+  if (noclipInterval) clearInterval(noclipInterval);
+  try {
+    const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
+    if (localPlayer) {
+      if (typeof localPlayer.setCollision === 'function') localPlayer.setCollision(false);
+      if (localPlayer.position) {
+        noclipPosition = [localPlayer.position[0], localPlayer.position[1], localPlayer.position[2]];
+      }
+    }
+  } catch (e) {}
+
+  const speed = 1.35;
+  noclipInterval = setInterval(() => {
+    if (!isNoclipActive) {
+      clearInterval(noclipInterval);
+      noclipInterval = null;
+      return;
+    }
+
+    let moved = false;
+    let forwardVec = [0, 1, 0];
+    let rightVec = [1, 0, 0];
+    let upVec = [0, 0, 1];
+
+    try {
+      const camSys = mp.game.ScriptGameInstance.GetCameraSystem();
+      if (camSys) {
+        const f = camSys.GetActiveCameraForward();
+        const r = camSys.GetActiveCameraRight();
+        const u = camSys.GetActiveCameraUp();
+        if (f) forwardVec = [f.x || 0, f.y || 0, f.z || 0];
+        if (r) rightVec = [r.x || 0, r.y || 0, r.z || 0];
+        if (u) upVec = [u.x || 0, u.y || 0, u.z || 0];
+      }
+    } catch (e) {}
+
+    // W = 87, S = 83, A = 65, D = 68, Space = 32, Shift = 16, C = 67
+    if (keyStates[87]) { // W Forward
+      noclipPosition[0] += forwardVec[0] * speed;
+      noclipPosition[1] += forwardVec[1] * speed;
+      noclipPosition[2] += forwardVec[2] * speed;
+      moved = true;
+    }
+    if (keyStates[83]) { // S Backward
+      noclipPosition[0] -= forwardVec[0] * speed;
+      noclipPosition[1] -= forwardVec[1] * speed;
+      noclipPosition[2] -= forwardVec[2] * speed;
+      moved = true;
+    }
+    if (keyStates[68]) { // D Right
+      noclipPosition[0] += rightVec[0] * speed;
+      noclipPosition[1] += rightVec[1] * speed;
+      noclipPosition[2] += rightVec[2] * speed;
+      moved = true;
+    }
+    if (keyStates[65]) { // A Left
+      noclipPosition[0] -= rightVec[0] * speed;
+      noclipPosition[1] -= rightVec[1] * speed;
+      noclipPosition[2] -= rightVec[2] * speed;
+      moved = true;
+    }
+    if (keyStates[32]) { // Space Up
+      noclipPosition[2] += speed;
+      moved = true;
+    }
+    if (keyStates[16] || keyStates[67]) { // Shift / C Down
+      noclipPosition[2] -= speed;
+      moved = true;
+    }
+
+    if (moved) {
+      if (mp.local && typeof mp.local.spawnPlayer === 'function') {
+        mp.local.spawnPlayer(noclipPosition[0], noclipPosition[1], noclipPosition[2], 1.0);
+      }
+    }
+  }, 25);
+}
+
+function setNoclip(state) {
+  isNoclipActive = (state !== undefined) ? Boolean(state) : !isNoclipActive;
+  try {
+    const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
+    if (localPlayer && typeof localPlayer.setCollision === 'function') {
+      localPlayer.setCollision(!isNoclipActive);
+    }
+  } catch (err) {
+    console.log('[G-CyberRPcore] Noclip collision error:', err);
+  }
+
+  if (isNoclipActive) {
+    startNoclipFlight();
+  } else {
+    if (noclipInterval) {
+      clearInterval(noclipInterval);
+      noclipInterval = null;
+    }
+  }
+
+  if (mp.events && typeof mp.events.emitCef === 'function') {
+    mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/Shift.' : 'Disabled.', 'info');
+  }
+  console.log(`[G-CyberRPcore] Noclip state: ${isNoclipActive}`);
 }
 
 function handleTeleport(args) {
@@ -169,6 +306,9 @@ function handleTeleport(args) {
     spawnPlayer(coords[0], coords[1], coords[2], 1.0);
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('g-cyber:admin:teleportCoords', coords[0], coords[1], coords[2]);
+    }
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:admin:updateCoords', `${coords[0]}, ${coords[1]}, ${coords[2]}`);
     }
   } else if (args && args.length >= 3) {
     const x = parseFloat(args[0]);
@@ -179,14 +319,107 @@ function handleTeleport(args) {
       if (mp.events && typeof mp.events.emitServer === 'function') {
         mp.events.emitServer('g-cyber:admin:teleportCoords', x, y, z);
       }
+      if (mp.events && typeof mp.events.emitCef === 'function') {
+        mp.events.emitCef('g-cyber:admin:updateCoords', `${x}, ${y}, ${z}`);
+      }
     }
   }
 }
 
-function handleSpawnVehicle(args) {
-  const model = (args && args.length > 0) ? args[0] : 'QuadraTurboR';
+function spawnAdminVehicle(modelKey) {
+  const recId = VEHICLE_RECORD_MAP[modelKey] || modelKey || 'Vehicle.v_sport1_quadra_turbo_r_player';
+  console.log(`[G-CyberRPcore] Spawning vehicle: ${modelKey} (${recId})`);
+  try {
+    const vehSys = mp.game.ScriptGameInstance.GetVehicleSystem();
+    if (vehSys) {
+      vehSys.EnablePlayerVehicle(recId, true, false);
+      vehSys.SpawnPlayerVehicle(0, recId, false);
+    }
+  } catch (e) {
+    console.log('[G-CyberRPcore] VehicleSystem spawn notice:', e);
+  }
   if (mp.events && typeof mp.events.emitServer === 'function') {
-    mp.events.emitServer('g-cyber:admin:spawnVehicle', model);
+    mp.events.emitServer('g-cyber:admin:spawnVehicle', recId);
+  }
+  if (mp.events && typeof mp.events.emitCef === 'function') {
+    mp.events.emitCef('g-cyber:hud:notify', 'Vehicle Dispatched', `${modelKey} materialized near your position.`, 'success');
+  }
+}
+
+function handleAdminVehAction(action) {
+  console.log(`[G-CyberRPcore] Vehicle Action: ${action}`);
+  try {
+    const vehSys = mp.game.ScriptGameInstance.GetVehicleSystem();
+    if (action === 'repair') {
+      setHealth(SPAWN_HEALTH);
+    } else if (action === 'delete' && vehSys) {
+      const activeVeh = vehSys.GetActivePlayerVehicle();
+      if (activeVeh && activeVeh.recordID) {
+        vehSys.EnablePlayerVehicle(activeVeh.recordID, false, true);
+      }
+    }
+  } catch (e) {
+    console.log('[G-CyberRPcore] vehAction notice:', e);
+  }
+  if (mp.events && typeof mp.events.emitServer === 'function') {
+    mp.events.emitServer('g-cyber:admin:vehAction', action);
+  }
+}
+
+function handleAdminWeather(w) {
+  const WEATHER_MAP = {
+    'sunny': '24h_weather_sunny',
+    'rain': '24h_weather_rain',
+    'fog': '24h_weather_fog',
+    'sandstorm': '24h_weather_sandstorm',
+    'toxic': '24h_weather_toxic_rain',
+    'pollution': '24h_weather_heavy_clouds'
+  };
+  const weatherRes = WEATHER_MAP[(w || '').toLowerCase()] || '24h_weather_sunny';
+  try {
+    const weatherSys = mp.game.ScriptGameInstance.GetWeatherSystem();
+    if (weatherSys) {
+      weatherSys.SetWeather(weatherRes, 2.0, 1);
+    }
+  } catch (e) {
+    console.log('[G-CyberRPcore] WeatherSystem notice:', e);
+  }
+  if (mp.events && typeof mp.events.emitServer === 'function') {
+    mp.events.emitServer('g-cyber:admin:setWeather', weatherRes);
+  }
+}
+
+function handleAdminTime(hour) {
+  const h = parseInt(hour) || 12;
+  try {
+    const timeSys = mp.game.ScriptGameInstance.GetTimeSystem();
+    if (timeSys) {
+      timeSys.SetGameTimeByHMS(h, 0, 0, 'AdminTimeShift');
+    }
+  } catch (e) {
+    console.log('[G-CyberRPcore] TimeSystem notice:', e);
+  }
+  if (mp.events && typeof mp.events.emitServer === 'function') {
+    mp.events.emitServer('g-cyber:admin:setTime', h);
+  }
+}
+
+// =====================================================================
+// 4. Native Mirror & 3D Character Customization
+// =====================================================================
+
+function openNativeMirror() {
+  console.log('[G-CyberRPcore] Opening native REDengine character customization mirror...');
+  try {
+    const uiSys = mp.game.ScriptGameInstance.GetUISystem();
+    if (uiSys) {
+      uiSys.QueueMenuEvent("OnOpenMorphMenu");
+      if (mp.events && typeof mp.events.emitCef === 'function') {
+        mp.events.emitCef('g-cyber:hud:notify', 'Mirror Customizer', 'Connected to Cyberpunk 2077 biometric mirror.', 'success');
+      }
+    }
+  } catch (err) {
+    console.log('[G-CyberRPcore] openNativeMirror notice:', err);
   }
 }
 
@@ -202,21 +435,63 @@ function handleChar() {
 
 function handleSkin() {
   safeSetFocus(true, true);
+  // Teleport player in front of Megabuilding H10 Apartment illuminated studio mirror
+  spawnPlayer(CREATOR_STUDIO_COORDS[0], CREATOR_STUDIO_COORDS[1], CREATOR_STUDIO_COORDS[2], CREATOR_STUDIO_COORDS[3]);
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('g-cyber:ui:showCreator', 1);
   }
 }
 
+function applyCreatorClothingPreview(clothingJson) {
+  try {
+    const data = (typeof clothingJson === 'string') ? JSON.parse(clothingJson) : clothingJson;
+    console.log('[G-CyberRPcore] Applying clothing preview:', data);
+    const player = mp.game.GetPlayer();
+    if (!player) return;
+    const transSys = mp.game.ScriptGameInstance.GetTransactionSystem();
+    if (!transSys) return;
+
+    const OUTFIT_ITEMS = {
+      'samurai_leather': 'Items.Coat_01_basic_01',
+      'corpo_trench': 'Items.Coat_02_basic_01',
+      'nomad_denim': 'Items.Vest_01_basic_01',
+      'tactical_vest': 'Items.Vest_02_basic_01',
+      'tactical_cargo': 'Items.Pants_01_basic_01',
+      'corpo_slacks': 'Items.Pants_02_basic_01',
+      'reinforced_jeans': 'Items.Pants_03_basic_01',
+      'tech_aviator': 'Items.Glasses_01_basic_01',
+      'neural_visor': 'Items.Visor_01_basic_01',
+      'tactical_cap': 'Items.Hat_01_basic_01',
+      'oni_respirator': 'Items.Mask_01_basic_01',
+      'tactical_balaclava': 'Items.Mask_02_basic_01'
+    };
+
+    if (data.jacket && OUTFIT_ITEMS[data.jacket]) {
+      transSys.AddItemToSlot(player, "AttachmentSlots.Chest", OUTFIT_ITEMS[data.jacket]);
+    }
+    if (data.pants && OUTFIT_ITEMS[data.pants]) {
+      transSys.AddItemToSlot(player, "AttachmentSlots.Legs", OUTFIT_ITEMS[data.pants]);
+    }
+    if (data.headwear && OUTFIT_ITEMS[data.headwear]) {
+      transSys.AddItemToSlot(player, "AttachmentSlots.Head", OUTFIT_ITEMS[data.headwear]);
+    }
+    if (data.mask && OUTFIT_ITEMS[data.mask]) {
+      transSys.AddItemToSlot(player, "AttachmentSlots.Eyes", OUTFIT_ITEMS[data.mask]);
+    }
+  } catch (err) {
+    console.log('[G-CyberRPcore] Clothing preview notice:', err);
+  }
+}
+
 // =====================================================================
-// 3. Client Console Commands (F8 Console Overlay)
+// 5. Client Console Commands (F8 Console Overlay & Chat)
 // =====================================================================
 
 function registerCommand(name, fn) {
   try {
     if (mp.commands && typeof mp.commands.add === 'function') {
-      mp.commands.add(name, (p1, p2) => {
-        const args = Array.isArray(p1) ? p1 : (Array.isArray(p2) ? p2 : []);
-        fn(args);
+      mp.commands.add(name, (id, args) => {
+        fn(Array.isArray(args) ? args : []);
       });
     }
   } catch (e) {
@@ -228,15 +503,16 @@ registerCommand('admin', () => toggleAdminMenu());
 registerCommand('adminmenu', () => toggleAdminMenu());
 registerCommand('a', () => toggleAdminMenu());
 registerCommand('hub', () => toggleAdminMenu());
-registerCommand('noclip', () => toggleNoclip());
-registerCommand('god', () => toggleGodmode());
+registerCommand('noclip', () => setNoclip());
+registerCommand('god', () => setGodmode());
 registerCommand('tp', (args) => handleTeleport(args));
-registerCommand('car', (args) => handleSpawnVehicle(args));
-registerCommand('veh', (args) => handleSpawnVehicle(args));
+registerCommand('car', (args) => spawnAdminVehicle(args && args[0]));
+registerCommand('veh', (args) => spawnAdminVehicle(args && args[0]));
 registerCommand('char', () => handleChar());
 registerCommand('multichar', () => handleChar());
 registerCommand('skin', () => handleSkin());
 registerCommand('clothing', () => handleSkin());
+registerCommand('mirror', () => openNativeMirror());
 registerCommand('seatbelt', () => handleSeatbelt());
 registerCommand('ping', () => {
   console.log('[CyberMP] Server ping: 12ms (Optimal)');
@@ -265,7 +541,7 @@ registerCommand('closeui', () => {
 });
 
 // =====================================================================
-// 4. Official Engine Lifecycle Hooks (onInit & onceGameLoaded)
+// 6. Official Engine Lifecycle Hooks (onInit & onceGameLoaded)
 // =====================================================================
 
 // Stage 1: Resource Start
@@ -283,8 +559,9 @@ try {
       try {
         if (typeof mp.game.onInputKeyEvent === 'function') {
           mp.game.onInputKeyEvent((action, key) => {
-            // action 1 = IACT_Press
+            // action 1 = IACT_Press, action 0 = IACT_Release
             if (action === 1) {
+              keyStates[key] = true;
               if (key === 121) { // IK_F10
                 toggleAdminMenu();
               } else if (key === 84) { // IK_T
@@ -296,6 +573,8 @@ try {
                   mp.events.emitCef('g-cyber:ui:handleEscape');
                 }
               }
+            } else if (action === 0) {
+              keyStates[key] = false;
             }
           });
         }
@@ -311,7 +590,6 @@ try {
 // Stage 3: onceGameLoaded & onGameLoaded - World Ready
 function handleWorldReady() {
   console.log('[G-CyberRPcore] World loaded! Game environment ready.');
-  // If player skipped or already has an active character, spawn
   if (isSpawned) {
     spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
   }
@@ -334,7 +612,7 @@ try {
 }
 
 // =====================================================================
-// 5. CEF Browser Lifecycle & Event Handlers
+// 7. CEF Browser Lifecycle & Event Handlers
 // =====================================================================
 
 if (mp.events && typeof mp.events.onCef === 'function') {
@@ -390,59 +668,124 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     }
   });
 
+  // Admin Panel Focus
   mp.events.onCef('admin:focus', (state) => {
     safeSetFocus(state, state);
   });
 
+  // Admin Self Toggles (Godmode, Noclip)
+  mp.events.onCef('g-cyber:admin:toggleSelf', (type, state) => {
+    if (type === 'godmode' || type === 'god') {
+      setGodmode(state);
+    } else if (type === 'noclip') {
+      setNoclip(state);
+    }
+  });
+
+  // Admin Self Actions (Heal, Stress Reset)
+  mp.events.onCef('g-cyber:admin:selfAction', (action) => {
+    if (action === 'heal') {
+      setMaxHealth(SPAWN_HEALTH);
+      setHealth(SPAWN_HEALTH);
+      if (mp.events && typeof mp.events.emitServer === 'function') {
+        mp.events.emitServer('g-cyber:server:adminSelfAction', 'heal');
+      }
+      if (mp.events && typeof mp.events.emitCef === 'function') {
+        mp.events.emitCef('g-cyber:hud:notify', 'Healed', 'Health and cyberware armor restored.', 'success');
+      }
+    } else if (action === 'stress') {
+      if (mp.events && typeof mp.events.emitServer === 'function') {
+        mp.events.emitServer('g-cyber:server:adminSelfAction', 'stress');
+      }
+      if (mp.events && typeof mp.events.emitCef === 'function') {
+        mp.events.emitCef('g-cyber:hud:notify', 'Mind Cleared', 'Neural stress indicators zeroed.', 'success');
+      }
+    }
+  });
+
+  // Admin District Quick Teleport
+  mp.events.onCef('g-cyber:admin:teleportDistrict', (loc) => {
+    handleTeleport([loc]);
+  });
+
+  // Admin Coordinates Teleport
   mp.events.onCef('admin:teleport', (x, y, z) => {
-    spawnPlayer(x, y, z, 1.0);
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:teleportCoords', x, y, z);
-    }
+    handleTeleport([x, y, z]);
   });
 
+  // Admin Spawn Vehicle
+  mp.events.onCef('g-cyber:admin:spawnVehicle', (model) => {
+    spawnAdminVehicle(model);
+  });
   mp.events.onCef('admin:spawnCar', (model) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:spawnVehicle', model);
-    }
+    spawnAdminVehicle(model);
   });
 
+  // Admin Vehicle Actions (Repair, Flip, Delete)
+  mp.events.onCef('g-cyber:admin:vehAction', (action) => {
+    handleAdminVehAction(action);
+  });
+
+  // Admin Weather & Time
+  mp.events.onCef('g-cyber:admin:setWeather', (weather) => {
+    handleAdminWeather(weather);
+  });
   mp.events.onCef('admin:weather', (weather) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:setWeather', weather);
-    }
+    handleAdminWeather(weather);
   });
 
+  mp.events.onCef('g-cyber:admin:setTime', (hour) => {
+    handleAdminTime(hour);
+  });
   mp.events.onCef('admin:time', (hour) => {
-    if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:admin:setTime', hour);
-    }
+    handleAdminTime(hour);
   });
 
+  // Admin Player Actions
+  mp.events.onCef('g-cyber:admin:playerAction', (action, targetId) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:server:adminPlayerAction', action, targetId);
+    }
+  });
   mp.events.onCef('admin:playerAction', (action, targetId) => {
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('g-cyber:server:adminPlayerAction', action, targetId);
     }
   });
 
-  mp.events.onCef('admin:selfAction', (action) => {
-    if (action === 'god') toggleGodmode();
-    else if (action === 'noclip') toggleNoclip();
-    else if (mp.events && typeof mp.events.emitServer === 'function') {
-      mp.events.emitServer('g-cyber:server:adminSelfAction', action);
+  // Admin Broadcast
+  mp.events.onCef('g-cyber:admin:broadcast', (text) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:admin:broadcast', text);
     }
   });
-
   mp.events.onCef('admin:broadcast', (text) => {
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('g-cyber:admin:broadcast', text);
     }
   });
 
+  // Admin Data Request
   mp.events.onCef('g-cyber:admin:requestData', () => {
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('g-cyber:server:requestAdminData');
     }
+  });
+
+  // Character Creator Native Mirror & 3D Studio Controls
+  mp.events.onCef('g-cyber:creator:openNativeMirror', () => {
+    openNativeMirror();
+  });
+
+  mp.events.onCef('g-cyber:creator:rotateCharacter', (yaw) => {
+    currentCreatorYaw = parseFloat(yaw) || 90.0;
+    if (mp.local && typeof mp.local.spawnPlayer === 'function') {
+      mp.local.spawnPlayer(CREATOR_STUDIO_COORDS[0], CREATOR_STUDIO_COORDS[1], CREATOR_STUDIO_COORDS[2], currentCreatorYaw);
+    }
+  });
+
+  mp.events.onCef('g-cyber:creator:previewChange', (clothingJson) => {
+    applyCreatorClothingPreview(clothingJson);
   });
 
   // Chat CEF Events
@@ -456,17 +799,19 @@ if (mp.events && typeof mp.events.onCef === 'function') {
       if (cmd === 'admin' || cmd === 'a' || cmd === 'hub') {
         toggleAdminMenu();
       } else if (cmd === 'noclip') {
-        toggleNoclip();
+        setNoclip();
       } else if (cmd === 'god') {
-        toggleGodmode();
-      } else if (cmd === 'char') {
+        setGodmode();
+      } else if (cmd === 'char' || cmd === 'multichar') {
         handleChar();
-      } else if (cmd === 'skin') {
+      } else if (cmd === 'skin' || cmd === 'clothing') {
         handleSkin();
+      } else if (cmd === 'mirror') {
+        openNativeMirror();
       } else if (cmd === 'tp') {
         handleTeleport(args);
       } else if (cmd === 'car' || cmd === 'veh') {
-        handleSpawnVehicle(args);
+        spawnAdminVehicle(args[0]);
       } else if (cmd === 'closeui') {
         safeSetFocus(false, false);
         mp.events.emitCef('g-cyber:ui:closeAll');
@@ -486,7 +831,7 @@ if (mp.events && typeof mp.events.onCef === 'function') {
 }
 
 // =====================================================================
-// 6. Server Event Handlers
+// 8. Server Event Handlers
 // =====================================================================
 
 if (mp.events && typeof mp.events.onServer === 'function') {
@@ -497,8 +842,8 @@ if (mp.events && typeof mp.events.onServer === 'function') {
       mp.events.emitCef('g-cyber:ui:closeAll');
     }
   });
-  mp.events.onServer('g-cyber:client:toggleNoclip', () => toggleNoclip());
-  mp.events.onServer('g-cyber:client:toggleGod', () => toggleGodmode());
+  mp.events.onServer('g-cyber:client:toggleNoclip', () => setNoclip());
+  mp.events.onServer('g-cyber:client:toggleGod', () => setGodmode());
   mp.events.onServer('g-cyber:client:showCreator', () => handleSkin());
   mp.events.onServer('g-cyber:client:showMultichar', () => handleChar());
   mp.events.onServer('g-cyber:client:respawn', () => {
@@ -529,13 +874,13 @@ if (mp.events && typeof mp.events.onServer === 'function') {
 
   mp.events.onServer('g-cyber:client:receiveAdminData', (listJson) => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
-      mp.events.emitCef('g-cyber:ui:receiveAdminData', listJson);
+      mp.events.emitCef('g-cyber:admin:updatePlayers', listJson);
     }
   });
 
   mp.events.onServer('g-cyber:client:adminBroadcast', (text) => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
-      mp.events.emitCef('g-cyber:ui:broadcast', text);
+      mp.events.emitCef('g-cyber:admin:broadcast', text);
     }
   });
 
