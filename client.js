@@ -249,18 +249,22 @@ registerCommand('closeui', () => {
   if (mp.cef && typeof mp.cef.setFocus === 'function') {
     mp.cef.setFocus(false, false);
   }
+  if (mp.events && typeof mp.events.emitCef === 'function') {
+    mp.events.emitCef('g-cyber:ui:closeAll');
+  }
 });
 
 // =====================================================================
 // 4. Official Engine Lifecycle Hooks (onInit & onceGameLoaded)
 // =====================================================================
 
-// Stage 1: Resource Start - Prepare CEF URL without stealing early input focus
+// Stage 1: Resource Start - Prepare CEF URL and enable interactive input focus
 if (mp.events && typeof mp.events.on === 'function') {
   mp.events.on('resourceStart', () => {
-    console.log('[G-CyberRPcore] resourceStart: Mounting Master CEF view...');
-    if (mp.cef && typeof mp.cef.setUrl === 'function') {
-      mp.cef.setUrl('./ui/index.html');
+    console.log('[G-CyberRPcore] resourceStart: Mounting Master CEF view and enabling focus...');
+    if (mp.cef) {
+      if (typeof mp.cef.setUrl === 'function') mp.cef.setUrl('./ui/index.html');
+      if (typeof mp.cef.setFocus === 'function') mp.cef.setFocus(true, true);
     }
   });
 }
@@ -281,6 +285,10 @@ try {
                 openChat();
               } else if (key === 66) { // IK_B
                 handleSeatbelt();
+              } else if (key === 27) { // IK_Escape
+                if (mp.events && typeof mp.events.emitCef === 'function') {
+                  mp.events.emitCef('g-cyber:ui:handleEscape');
+                }
               }
             }
           });
@@ -344,11 +352,33 @@ setTimeout(() => {
 if (mp.events && typeof mp.events.onCef === 'function') {
   mp.events.onCef('domReady', (name) => {
     console.log('[G-CyberRPcore] CEF DOM ready:', name);
+    if (mp.cef && typeof mp.cef.setFocus === 'function') {
+      mp.cef.setFocus(true, true);
+    }
     mp.events.emitCef('g-cyber:ui:showLoading');
+  });
+
+  mp.events.onCef('g-cyber:ui:setFocus', (state) => {
+    if (mp.cef && typeof mp.cef.setFocus === 'function') {
+      mp.cef.setFocus(Boolean(state), Boolean(state));
+    }
+  });
+
+  mp.events.onCef('g-cyber:loading:close', () => {
+    console.log('[G-CyberRPcore] Loading screen closed. Releasing input focus to game.');
+    if (mp.cef && typeof mp.cef.setFocus === 'function') {
+      mp.cef.setFocus(false, false);
+    }
+    if (!isSpawned) {
+      spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+    }
   });
 
   mp.events.onCef('g-cyber:loading:finish', () => {
     console.log('[G-CyberRPcore] Loading screen finished. Requesting character roster...');
+    if (mp.cef && typeof mp.cef.setFocus === 'function') {
+      mp.cef.setFocus(true, true);
+    }
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('g-cyber:server:requestCharacters');
     }
@@ -504,6 +534,14 @@ if (mp.events && typeof mp.events.onCef === 'function') {
 
 if (mp.events && typeof mp.events.onServer === 'function') {
   mp.events.onServer('g-cyber:client:toggleAdmin', () => toggleAdminMenu());
+  mp.events.onServer('g-cyber:client:closeUI', () => {
+    if (mp.cef && typeof mp.cef.setFocus === 'function') {
+      mp.cef.setFocus(false, false);
+    }
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:ui:closeAll');
+    }
+  });
   mp.events.onServer('g-cyber:client:toggleNoclip', () => toggleNoclip());
   mp.events.onServer('g-cyber:client:toggleGod', () => toggleGodmode());
   mp.events.onServer('g-cyber:client:showCreator', () => handleSkin());

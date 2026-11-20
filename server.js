@@ -444,6 +444,16 @@ if (mp.commands) {
     if (player) player.emit('g-cyber:client:respawn');
   });
 
+  // Command: closeui (Releases CEF focus and enters gameplay)
+  mp.commands.add('closeui', (player, args) => {
+    if (player) {
+      if (typeof player.emit === 'function') player.emit('g-cyber:client:closeUI');
+      if (mp.events && typeof mp.events.emitClient === 'function') {
+        mp.events.emitClient(player.id, 'g-cyber:client:closeUI');
+      }
+    }
+  });
+
   // Command: ping
   mp.commands.add('ping', (player, args) => {
     if (player) {

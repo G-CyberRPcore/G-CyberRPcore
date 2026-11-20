@@ -11,6 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const viewHud = document.getElementById('view-hud');
   const viewAdmin = document.getElementById('view-admin');
 
+  // Request CEF input focus immediately so mouse cursor and keyboard work
+  if (window.mp && mp.events) {
+    mp.events.emit('domReady', 'master-ui');
+    mp.events.emit('g-cyber:ui:setFocus', true);
+  }
+
   // Layers Array
   const allViews = [viewLoading, viewMultichar, viewCreator, viewHud, viewAdmin];
 
@@ -267,6 +273,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, 100);
 
+  const btnSkipLoading = document.getElementById('btn-skip-loading');
+  const btnQuickEnter = document.getElementById('btn-quick-enter');
+  const btnMulticharSkip = document.getElementById('btn-multichar-skip');
+
+  function skipLoadingAndPlay() {
+    if (bgAudio) {
+      bgAudio.pause();
+    }
+    showView(viewHud);
+    if (window.mp && mp.events) {
+      mp.events.emit('g-cyber:loading:close');
+      mp.events.emit('g-cyber:ui:setFocus', false);
+    }
+    showToast('Night City Connected', 'Welcome to Night City citizen. Neural connection established.', 'success');
+  }
+
+  if (btnSkipLoading) btnSkipLoading.addEventListener('click', skipLoadingAndPlay);
+  if (btnQuickEnter) btnQuickEnter.addEventListener('click', skipLoadingAndPlay);
+  if (btnMulticharSkip) btnMulticharSkip.addEventListener('click', skipLoadingAndPlay);
+
   function jackInAction() {
     // Fade out audio
     const fade = setInterval(() => {
@@ -278,9 +304,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }, 40);
 
+    // Transition immediately to multicharacter view
+    showView(viewMultichar);
+
     // Notify client script
     if (window.mp && mp.events) {
       mp.events.emit('g-cyber:loading:finish');
+      mp.events.emit('g-cyber:ui:setFocus', true);
     }
 
     // Check if player has characters or open multicharacter
@@ -810,6 +840,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Global Keybinds
   window.addEventListener('keydown', (e) => {
+    if (viewLoading && viewLoading.classList.contains('active')) {
+      if (e.key === 'Enter' || e.code === 'Enter' || e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        jackInAction();
+        return;
+      } else if (e.key === 'Escape' || e.code === 'Escape') {
+        e.preventDefault();
+        skipLoadingAndPlay();
+        return;
+      }
+    } else if (viewMultichar && viewMultichar.classList.contains('active')) {
+      if (e.key === 'Escape' || e.code === 'Escape') {
+        e.preventDefault();
+        skipLoadingAndPlay();
+        return;
+      }
+    }
+
     if (e.key === 'F10' || e.key === 'Insert') {
       e.preventDefault();
       toggleAdminMenu();
@@ -832,6 +880,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // =====================================================================
   if (window.mp && mp.events) {
     mp.events.on('g-cyber:ui:showLoading', () => showView(viewLoading));
+    mp.events.on('g-cyber:ui:handleEscape', () => {
+      if (viewLoading && viewLoading.classList.contains('active')) {
+        skipLoadingAndPlay();
+      } else if (viewMultichar && viewMultichar.classList.contains('active')) {
+        skipLoadingAndPlay();
+      } else if (isAdminOpen) {
+        toggleAdminMenu(false);
+      } else if (isChatOpen) {
+        closeChat();
+      }
+    });
+    mp.events.on('g-cyber:ui:closeAll', () => {
+      skipLoadingAndPlay();
+    });
     mp.events.on('g-cyber:ui:showMulticharacter', (charsJson) => {
       try {
         const chars = JSON.parse(charsJson);
