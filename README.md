@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="./assets/logo.svg" alt="G-CyberRPcore Logo" width="320" />
+  <img src="./assets/logo-banner.jpg" alt="G-CyberRPcore Banner" width="560" />
 
   # G-CyberRPcore
 

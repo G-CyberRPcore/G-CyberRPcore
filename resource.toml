@@ -8,11 +8,15 @@ file = [
   "./ui/index.html",
   "./ui/style.css",
   "./ui/app.js",
-  "./ui/assets/logo.svg",
   "./ui/assets/logo.jpg",
+  "./ui/assets/logo-banner.jpg",
+  "./ui/assets/logo-icon.jpg",
+  "./ui/assets/logo.svg",
   "./ui/audio/G-CyberRPcore-Loading.mp3",
-  "./assets/logo.svg",
-  "./assets/logo.jpg"
+  "./assets/logo.jpg",
+  "./assets/logo-banner.jpg",
+  "./assets/logo-icon.jpg",
+  "./assets/logo.svg"
 ]
 
 use_game_natives = true
