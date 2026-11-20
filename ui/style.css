@@ -640,7 +640,7 @@ body {
 .ticker-prefix { color: var(--neon-cyan); }
 
 /* =====================================================================
-   LAYER 2: MULTICHARACTER SCREEN (qb-multicharacter)
+   LAYER 2: MULTICHARACTER SCREEN
    ===================================================================== */
 #view-multicharacter {
   justify-content: center;
@@ -801,7 +801,7 @@ body {
 }
 
 /* =====================================================================
-   LAYER 3: CHARACTER & CLOTHING CREATOR (qb-clothing)
+   LAYER 3: CHARACTER & CLOTHING CREATOR
    ===================================================================== */
 #view-creator {
   justify-content: center;
@@ -1298,7 +1298,7 @@ body {
 }
 
 /* =====================================================================
-   LAYER 6: ADMIN MENU (qb-adminmenu)
+   LAYER 6: ADMIN MENU
    ===================================================================== */
 #view-admin {
   justify-content: center;

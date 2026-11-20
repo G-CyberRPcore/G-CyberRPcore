@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
   btnJackIn.addEventListener('click', jackInAction);
 
   // =====================================================================
-  // 4. Multicharacter System (qb-multicharacter)
+  // 4. Multicharacter System
   // =====================================================================
   const charactersGrid = document.getElementById('characters-slots-grid');
   let currentCharactersList = [];
@@ -400,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =====================================================================
-  // 5. Character & Clothing Creator (qb-clothing)
+  // 5. Character & Clothing Creator
   // =====================================================================
   let targetCreationSlot = 1;
   let selectedLifePath = 'streetkid';
@@ -614,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =====================================================================
-  // 8. Admin Control Panel (qb-adminmenu - F10 / /admin)
+  // 8. Admin Control Panel (F10 / /admin)
   // =====================================================================
   let isAdminOpen = false;
   let selectedAdminPlayerId = null;

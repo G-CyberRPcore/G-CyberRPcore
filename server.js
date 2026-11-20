@@ -27,7 +27,7 @@ function isPlayerAdmin(player) {
 }
 
 // =====================================================================
-// 1. Multicharacter & Identity Handlers (qb-multicharacter)
+// 1. Multicharacter & Identity Handlers
 // =====================================================================
 
 // Client requests character slots
@@ -153,7 +153,7 @@ mp.events.onClient('g-cyber:server:deleteCharacter', (player, citizenid) => {
 });
 
 // =====================================================================
-// 2. Admin Management System (qb-adminmenu)
+// 2. Admin Management System
 // =====================================================================
 
 // Request Admin Data (List of players)

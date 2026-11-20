@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // =====================================================================
-  // 2. Interactive Tabs (qb-loading style)
+  // 2. Interactive Tabs
   // =====================================================================
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {

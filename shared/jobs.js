@@ -1,5 +1,5 @@
 // G-CyberRPcore - Central Shared Job & Hierarchy Registry
-// Multi-tier career system with salary, grades, and permissions inspired by QBCore
+// Multi-tier career system with salary, grades, and permissions
 
 const SharedJobs = {
   civilian: {

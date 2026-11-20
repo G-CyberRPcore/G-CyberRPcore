@@ -6,11 +6,11 @@
 
   **The Definitive, Modular Roleplay Framework for Cyberpunk 2077 (CyberMP)**
   
-  *Pioneering the Next Generation of Multiplayer Roleplay in Night City — Inspired by QBCore.*
+  *Pioneering the Next Generation of Multiplayer Roleplay in Night City — Built from the Ground Up for CyberMP.*
 
   [![Platform: CyberMP](https://img.shields.io/badge/Platform-CyberMP%20v4.0%2B-00F0FF?style=for-the-badge&logo=gamepad)](https://cyber.mp)
   [![Language: JavaScript](https://img.shields.io/badge/Language-JavaScript%20ES6%2B-FCEE0A?style=for-the-badge&logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-  [![Architecture: QBCore](https://img.shields.io/badge/Architecture-QBCore%20Standard-FF003C?style=for-the-badge)](https://github.com/G-CyberRPcore)
+  [![Architecture: Native](https://img.shields.io/badge/Architecture-Native%20CyberMP-FF003C?style=for-the-badge)](https://github.com/G-CyberRPcore)
   [![License: MIT](https://img.shields.io/badge/License-MIT-white?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 </div>
@@ -21,7 +21,7 @@
 
 **G-CyberRPcore** is an ambitious, community-driven roleplay framework engineered from the ground up specifically for the newly released **CyberMP** multiplayer mod for *Cyberpunk 2077*.
 
-Drawing heavy inspiration from **QBCore** (the industry-standard FiveM framework), G-CyberRPcore provides a comprehensive, production-ready, and extensible foundation for server developers.
+Engineered from scratch specifically for CyberMP, G-CyberRPcore provides an original, comprehensive, production-ready, and extensible foundation for Cyberpunk 2077 server developers.
 
 ---
 

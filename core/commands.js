@@ -1,5 +1,5 @@
 // G-CyberRPcore - Central Command Registration & Permission System
-// Modeled directly on QBCore.Commands.Add
+// Native Command Registration & Permission Engine
 
 class CommandManager {
   constructor() {

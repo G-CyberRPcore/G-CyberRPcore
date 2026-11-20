@@ -1,5 +1,5 @@
 // G-CyberRPcore - Central Shared Item Registry
-// Standard item registry definitions inspired by QBCore
+// Standard item registry definitions for Night City
 
 const SharedItems = {
   // --- MEDICAL & RECOVERY ---

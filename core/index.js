@@ -1,5 +1,5 @@
 // G-CyberRPcore - Main Export Singleton
-// The definitive framework core for Cyberpunk 2077 (CyberMP) - Equivalent to QBCore
+// The definitive framework core for Cyberpunk 2077 (CyberMP)
 
 const Player = require('./player');
 const db = require('./database');

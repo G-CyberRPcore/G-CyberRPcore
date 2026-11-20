@@ -1,5 +1,5 @@
 // G-CyberRPcore - PlayerData Class & Functions
-// Fully featured citizen object modeled after QBCore's PlayerData
+// Fully featured citizen object & persistent PlayerData structure
 
 const SharedItems = require('../shared/items');
 const SharedJobs = require('../shared/jobs');

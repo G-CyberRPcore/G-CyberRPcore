@@ -1,5 +1,5 @@
 // G-CyberRPcore - Server-Client Async Callbacks System
-// Modeled directly on QBCore.Functions.CreateCallback / TriggerCallback
+// Native Asynchronous RPC Callback Engine
 
 class CallbackManager {
   constructor() {
