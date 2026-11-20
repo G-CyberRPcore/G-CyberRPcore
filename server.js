@@ -106,12 +106,23 @@ mp.events.onClient('g-cyber:server:createCharacter', (player, characterJson) => 
 
     // Notify client that character was loaded
     player.emit('g-cyber:client:characterLoaded', JSON.stringify(newChar));
-    corePlayer.Functions.SyncHUD();
-    corePlayer.Functions.Notify('Welcome to Night City', `Identity ${newChar.charinfo.firstname} ${newChar.charinfo.lastname} initialized.`, 'success');
+    if (corePlayer) {
+      if (corePlayer.Functions && typeof corePlayer.Functions.SyncHUD === 'function') {
+        corePlayer.Functions.SyncHUD();
+      } else if (typeof corePlayer.SyncHUD === 'function') {
+        corePlayer.SyncHUD();
+      }
+      if (corePlayer.Functions && typeof corePlayer.Functions.Notify === 'function') {
+        corePlayer.Functions.Notify('Welcome to Night City', `Identity ${newChar.charinfo.firstname} ${newChar.charinfo.lastname} initialized.`, 'success');
+      } else if (typeof corePlayer.Notify === 'function') {
+        corePlayer.Notify('Welcome to Night City', `Identity ${newChar.charinfo.firstname} ${newChar.charinfo.lastname} initialized.`, 'success');
+      }
+    }
 
     console.log(`[Multicharacter] New Citizen registered: ${newChar.charinfo.firstname} ${newChar.charinfo.lastname} (${citizenid})`);
   } catch (err) {
-    console.error('[Multicharacter] Error creating character:', err);
+    console.error('[Multicharacter] Error creating character:', err.message || err);
+    if (err.stack) console.error(err.stack);
   }
 });
 
@@ -132,12 +143,23 @@ mp.events.onClient('g-cyber:server:selectCharacter', (player, citizenid) => {
 
     // Notify client
     player.emit('g-cyber:client:characterLoaded', JSON.stringify(charData));
-    corePlayer.Functions.SyncHUD();
-    corePlayer.Functions.Notify('Identity Loaded', `Welcome back to Night City, ${charData.charinfo.firstname}.`, 'success');
+    if (corePlayer) {
+      if (corePlayer.Functions && typeof corePlayer.Functions.SyncHUD === 'function') {
+        corePlayer.Functions.SyncHUD();
+      } else if (typeof corePlayer.SyncHUD === 'function') {
+        corePlayer.SyncHUD();
+      }
+      if (corePlayer.Functions && typeof corePlayer.Functions.Notify === 'function') {
+        corePlayer.Functions.Notify('Identity Loaded', `Welcome back to Night City, ${charData.charinfo.firstname}.`, 'success');
+      } else if (typeof corePlayer.Notify === 'function') {
+        corePlayer.Notify('Identity Loaded', `Welcome back to Night City, ${charData.charinfo.firstname}.`, 'success');
+      }
+    }
 
     console.log(`[Multicharacter] Player ${player.nickname} selected ${charData.charinfo.firstname} (${citizenid})`);
   } catch (err) {
-    console.error('[Multicharacter] Error selecting character:', err);
+    console.error('[Multicharacter] Error selecting character:', err.message || err);
+    if (err.stack) console.error(err.stack);
   }
 });
 
@@ -215,23 +237,29 @@ mp.events.onClient('g-cyber:server:adminPlayerAction', (player, action, targetId
     case 'heal':
       target.health = 100;
       if (targetCore) {
-        targetCore.Functions.SetMetaData('health', 100);
-        targetCore.Functions.SetMetaData('armor', 100);
-        targetCore.Functions.SyncHUD();
+        if (targetCore.Functions && typeof targetCore.Functions.SetMetaData === 'function') {
+          targetCore.Functions.SetMetaData('health', 100);
+          targetCore.Functions.SetMetaData('armor', 100);
+        }
+        if (targetCore.Functions && typeof targetCore.Functions.SyncHUD === 'function') {
+          targetCore.Functions.SyncHUD();
+        } else if (typeof targetCore.SyncHUD === 'function') {
+          targetCore.SyncHUD();
+        }
       }
       player.emit('g-cyber:client:notify', 'Healed', `Player #${targetId} health restored to 100%`, 'success');
       target.emit('g-cyber:client:notify', 'Healed', 'Your vitals were restored by Trauma Admin.', 'success');
       break;
 
     case 'givemoney':
-      if (targetCore) {
+      if (targetCore && targetCore.Functions && typeof targetCore.Functions.AddMoney === 'function') {
         targetCore.Functions.AddMoney('cash', 10000, 'Admin Grant');
         player.emit('g-cyber:client:notify', 'Money Sent', `Granted $10,000 cash to player #${targetId}`, 'success');
       }
       break;
 
     case 'setjob':
-      if (targetCore) {
+      if (targetCore && targetCore.Functions && typeof targetCore.Functions.SetJob === 'function') {
         targetCore.Functions.SetJob('ncpd', 2);
         player.emit('g-cyber:client:notify', 'Job Updated', `Set player #${targetId} to NCPD Sergeant`, 'success');
       }
@@ -252,14 +280,26 @@ mp.events.onClient('g-cyber:server:adminSelfAction', (player, action) => {
   if (action === 'heal') {
     player.health = 100;
     if (coreP) {
-      coreP.Functions.SetMetaData('health', 100);
-      coreP.Functions.SetMetaData('armor', 100);
-      coreP.Functions.SyncHUD();
+      if (coreP.Functions && typeof coreP.Functions.SetMetaData === 'function') {
+        coreP.Functions.SetMetaData('health', 100);
+        coreP.Functions.SetMetaData('armor', 100);
+      }
+      if (coreP.Functions && typeof coreP.Functions.SyncHUD === 'function') {
+        coreP.Functions.SyncHUD();
+      } else if (typeof coreP.SyncHUD === 'function') {
+        coreP.SyncHUD();
+      }
     }
   } else if (action === 'stress') {
     if (coreP) {
-      coreP.Functions.SetMetaData('stress', 0);
-      coreP.Functions.SyncHUD();
+      if (coreP.Functions && typeof coreP.Functions.SetMetaData === 'function') {
+        coreP.Functions.SetMetaData('stress', 0);
+      }
+      if (coreP.Functions && typeof coreP.Functions.SyncHUD === 'function') {
+        coreP.Functions.SyncHUD();
+      } else if (typeof coreP.SyncHUD === 'function') {
+        coreP.SyncHUD();
+      }
     }
   }
 });
