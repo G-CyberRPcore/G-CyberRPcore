@@ -30,9 +30,16 @@ let noclipPosition = [-1392.637, 1271.536, 123.082];
 let noclipInterval = null;
 const keyStates = {};
 
+function clearNoclipKeys() {
+  for (const k in keyStates) {
+    keyStates[k] = false;
+  }
+}
+
 // Safe focus helper
 function safeSetFocus(keyboard, mouse) {
   try {
+    clearNoclipKeys();
     if (mp.cef && typeof mp.cef.setFocus === 'function') {
       mp.cef.setFocus(Boolean(keyboard), Boolean(mouse));
     }
@@ -226,6 +233,8 @@ function applyNoclipPosition(pos) {
 
 function startNoclipFlight() {
   if (noclipInterval) clearInterval(noclipInterval);
+  clearNoclipKeys();
+
   try {
     const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
     if (localPlayer) {
@@ -250,53 +259,50 @@ function startNoclipFlight() {
       return;
     }
 
-    const baseSpeed = 1.35;
+    const baseSpeed = 0.6;
     // Shift (16) provides 2.5x speed boost
-    const speed = keyStates[16] ? (baseSpeed * 2.5) : baseSpeed;
+    const speed = (keyStates[16] === true) ? (baseSpeed * 2.5) : baseSpeed;
 
     let forwardVec = [0, 1, 0];
     let rightVec = [1, 0, 0];
-    let upVec = [0, 0, 1];
 
     try {
       const camSys = mp.game.ScriptGameInstance.GetCameraSystem();
       if (camSys) {
         const f = camSys.GetActiveCameraForward();
         const r = camSys.GetActiveCameraRight();
-        const u = camSys.GetActiveCameraUp();
-        if (f) forwardVec = [f.x || 0, f.y || 0, f.z || 0];
-        if (r) rightVec = [r.x || 0, r.y || 0, r.z || 0];
-        if (u) upVec = [u.x || 0, u.y || 0, u.z || 0];
+        if (f && typeof f.x === 'number') forwardVec = [f.x, f.y, f.z];
+        if (r && typeof r.x === 'number') rightVec = [r.x, r.y, r.z];
       }
     } catch (e) {}
 
     // Flight directional controls:
     // W = 87 (Forward along camera gaze), S = 83 (Backward), D = 68 (Right), A = 65 (Left)
-    // Space = 32 or E = 69 (Ascend), C = 67 or Ctrl = 17 or Q = 81 (Descend)
-    if (keyStates[87]) { // W Forward
+    // Space = 32 (Ascend strictly), Ctrl = 17 or C = 67 (Descend strictly)
+    if (keyStates[87] === true) { // W Forward
       noclipPosition[0] += forwardVec[0] * speed;
       noclipPosition[1] += forwardVec[1] * speed;
       noclipPosition[2] += forwardVec[2] * speed;
     }
-    if (keyStates[83]) { // S Backward
+    if (keyStates[83] === true) { // S Backward
       noclipPosition[0] -= forwardVec[0] * speed;
       noclipPosition[1] -= forwardVec[1] * speed;
       noclipPosition[2] -= forwardVec[2] * speed;
     }
-    if (keyStates[68]) { // D Right
+    if (keyStates[68] === true) { // D Right
       noclipPosition[0] += rightVec[0] * speed;
       noclipPosition[1] += rightVec[1] * speed;
       noclipPosition[2] += rightVec[2] * speed;
     }
-    if (keyStates[65]) { // A Left
+    if (keyStates[65] === true) { // A Left
       noclipPosition[0] -= rightVec[0] * speed;
       noclipPosition[1] -= rightVec[1] * speed;
       noclipPosition[2] -= rightVec[2] * speed;
     }
-    if (keyStates[32] || keyStates[69]) { // Space / E Ascend
+    if (keyStates[32] === true) { // Space Ascend strictly
       noclipPosition[2] += speed;
     }
-    if (keyStates[67] || keyStates[17] || keyStates[81]) { // C / Ctrl / Q Descend
+    if (keyStates[17] === true || keyStates[67] === true) { // Ctrl / C Descend strictly
       noclipPosition[2] -= speed;
     }
 
@@ -307,6 +313,7 @@ function startNoclipFlight() {
 
 function setNoclip(state) {
   isNoclipActive = (state !== undefined) ? Boolean(state) : !isNoclipActive;
+  clearNoclipKeys();
 
   if (isNoclipActive) {
     startNoclipFlight();
@@ -327,7 +334,7 @@ function setNoclip(state) {
   }
 
   if (mp.events && typeof mp.events.emitCef === 'function') {
-    mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/C (Shift = Sprint).' : 'Disabled. Gravity restored.', 'info');
+    mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/Ctrl (Shift = Fast).' : 'Disabled. Gravity restored.', 'info');
   }
   console.log(`[G-CyberRPcore] Noclip state: ${isNoclipActive}`);
 }
@@ -618,8 +625,8 @@ try {
       try {
         if (typeof mp.game.onInputKeyEvent === 'function') {
           mp.game.onInputKeyEvent((action, key) => {
-            // action 1 = IACT_Press, action 0 = IACT_Release
-            if (action === 1) {
+            // CyberMP EInputAction: 1 = IACT_Press, 2 = IACT_Release
+            if (action === 1) { // Press
               keyStates[key] = true;
               if (key === 121) { // IK_F10
                 toggleAdminMenu();
@@ -632,7 +639,7 @@ try {
                   mp.events.emitCef('g-cyber:ui:handleEscape');
                 }
               }
-            } else if (action === 0) {
+            } else { // IACT_Release (2), IACT_None (0), or any other release/cancel
               keyStates[key] = false;
             }
           });
