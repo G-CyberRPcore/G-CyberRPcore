@@ -471,6 +471,16 @@ mp.events.onClient('g-cyber:admin:teleportCoords', (player, x, y, z) => {
   }
 });
 
+// Teleport to map marker / waypoint (Admin Only)
+mp.events.onClient('g-cyber:server:requestTpm', (player) => {
+  if (!player) return;
+  if (!isPlayerAdmin(player)) {
+    player.emit('g-cyber:client:notify', 'Access Denied', 'Command /tpm is restricted to Admins only.', 'error');
+    return;
+  }
+  player.emit('g-cyber:client:teleportToMarker');
+});
+
 // Player Lifecycle Hooks
 mp.events.on('playerConnecting', (tempId, name) => {
   console.log(`[Connect] Incoming connection from ${name} (TempID: ${tempId})`);
@@ -555,6 +565,16 @@ if (mp.commands) {
     if (player && args && args.length > 0) {
       player.emit('g-cyber:client:teleportCommand', args);
     }
+  });
+
+  // Command: tpm (Teleport to Map Waypoint - Admin Only)
+  mp.commands.add('tpm', (player) => {
+    if (!player) return;
+    if (!isPlayerAdmin(player)) {
+      player.emit('g-cyber:client:notify', 'Access Denied', 'Command /tpm is restricted to Admins only.', 'error');
+      return;
+    }
+    player.emit('g-cyber:client:teleportToMarker');
   });
 
   // Command: car / veh <model>

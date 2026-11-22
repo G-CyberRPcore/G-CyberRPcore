@@ -460,6 +460,99 @@ function handleTeleport(args) {
   }
 }
 
+function handleTeleportToMarker() {
+  console.log('[G-CyberRPcore] Processing /tpm - Teleport to map waypoint...');
+  let targetCoords = null;
+
+  try {
+    const mappinSys = (mp.game && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetMappinSystem === 'function')
+      ? mp.game.ScriptGameInstance.GetMappinSystem()
+      : null;
+
+    if (mappinSys) {
+      // 1. Check manually tracked custom waypoint
+      try {
+        if (typeof mappinSys.GetManuallyTrackedMappinID === 'function') {
+          const trackId = mappinSys.GetManuallyTrackedMappinID();
+          if (trackId) {
+            const m = (typeof mappinSys.GetMappin === 'function') ? mappinSys.GetMappin(trackId) : null;
+            if (m && typeof m.GetWorldPosition === 'function') {
+              const wp = m.GetWorldPosition();
+              if (wp && typeof wp.x === 'number' && !isNaN(wp.x)) {
+                targetCoords = { x: wp.x, y: wp.y, z: wp.z };
+              }
+            }
+          }
+        }
+      } catch (err1) {
+        console.log('[G-CyberRPcore] Tracked mappin query notice:', err1);
+      }
+
+      // 2. Scan all active mappins: CustomPositionVariant (21) or any player-tracked pin
+      if (!targetCoords && typeof mappinSys.GetAllMappins === 'function') {
+        try {
+          const all = mappinSys.GetAllMappins();
+          if (Array.isArray(all)) {
+            // Priority A: Custom map pin
+            for (let i = 0; i < all.length; i++) {
+              const m = all[i];
+              if (m && typeof m.GetVariant === 'function' && m.GetVariant() === 21) {
+                const wp = (typeof m.GetWorldPosition === 'function') ? m.GetWorldPosition() : null;
+                if (wp && typeof wp.x === 'number' && !isNaN(wp.x)) {
+                  targetCoords = { x: wp.x, y: wp.y, z: wp.z };
+                  break;
+                }
+              }
+            }
+
+            // Priority B: Any active tracked mappin
+            if (!targetCoords) {
+              for (let i = 0; i < all.length; i++) {
+                const m = all[i];
+                if (m && typeof m.IsPlayerTracked === 'function' && m.IsPlayerTracked()) {
+                  const wp = (typeof m.GetWorldPosition === 'function') ? m.GetWorldPosition() : null;
+                  if (wp && typeof wp.x === 'number' && !isNaN(wp.x)) {
+                    targetCoords = { x: wp.x, y: wp.y, z: wp.z };
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        } catch (err2) {
+          console.log('[G-CyberRPcore] All mappins query notice:', err2);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[G-CyberRPcore] handleTeleportToMarker error:', e);
+  }
+
+  if (targetCoords) {
+    // Elevate slightly above terrain to prevent clipping into the road/ground
+    const spawnZ = (typeof targetCoords.z === 'number' && !isNaN(targetCoords.z) && Math.abs(targetCoords.z) > 0.1)
+      ? (targetCoords.z + 1.5)
+      : 30.0;
+
+    spawnPlayer(targetCoords.x, targetCoords.y, spawnZ, 1.0);
+    safeSetFocus(false, false);
+
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:admin:teleportCoords', targetCoords.x, targetCoords.y, spawnZ);
+    }
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:hud:notify', 'Waypoint Teleport', `Teleported to [${targetCoords.x.toFixed(1)}, ${targetCoords.y.toFixed(1)}, ${spawnZ.toFixed(1)}]`, 'success');
+      mp.events.emitCef('g-cyber:admin:updateCoords', `${targetCoords.x.toFixed(1)}, ${targetCoords.y.toFixed(1)}, ${spawnZ.toFixed(1)}`);
+    }
+    console.log(`[G-CyberRPcore] /tpm teleported successfully to (${targetCoords.x}, ${targetCoords.y}, ${spawnZ})`);
+  } else {
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:hud:notify', 'No Waypoint Set', 'Open Map (M) and click to place a custom waypoint pin first.', 'warning');
+    }
+    console.log('[G-CyberRPcore] /tpm failed: No active map waypoint found.');
+  }
+}
+
 function spawnAdminVehicle(modelKey) {
   console.log(`[G-CyberRPcore] Admin requesting vehicle: ${modelKey}`);
   // Note: We deliberately do NOT call REDengine's offline single-player AI summoner (SpawnPlayerVehicle).
@@ -677,6 +770,11 @@ registerCommand('revive', () => {
   }
 });
 registerCommand('tp', (args) => handleTeleport(args));
+registerCommand('tpm', () => {
+  if (mp.events && typeof mp.events.emitServer === 'function') {
+    mp.events.emitServer('g-cyber:server:requestTpm');
+  }
+});
 registerCommand('car', (args) => spawnAdminVehicle(args && args[0]));
 registerCommand('veh', (args) => spawnAdminVehicle(args && args[0]));
 registerCommand('char', () => handleChar());
@@ -970,6 +1068,12 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     safeSetFocus(!nativeMode, !nativeMode);
   });
 
+  mp.events.onCef('g-cyber:admin:teleportToMarker', () => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('g-cyber:server:requestTpm');
+    }
+  });
+
   // Chat CEF Events
   mp.events.onCef('chatSubmit', (text) => {
     safeSetFocus(false, false);
@@ -984,6 +1088,10 @@ if (mp.events && typeof mp.events.onCef === 'function') {
         setNoclip();
       } else if (cmd === 'god') {
         setGodmode();
+      } else if (cmd === 'tpm') {
+        if (mp.events && typeof mp.events.emitServer === 'function') {
+          mp.events.emitServer('g-cyber:server:requestTpm');
+        }
       } else if (cmd === 'heal') {
         handleHealPlayer();
         if (mp.events && typeof mp.events.emitServer === 'function') {
@@ -1049,6 +1157,9 @@ if (mp.events && typeof mp.events.onServer === 'function') {
 
   mp.events.onServer('g-cyber:client:teleportCommand', (args) => {
     handleTeleport(args);
+  });
+  mp.events.onServer('g-cyber:client:teleportToMarker', () => {
+    handleTeleportToMarker();
   });
 
   mp.events.onServer('g-cyber:client:characterLoaded', (charJson) => {

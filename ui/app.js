@@ -1005,6 +1005,13 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Mind Calmed', 'Cyberpsychosis indicators reset to 0.', 'success');
   });
 
+  document.getElementById('btn-self-tpm')?.addEventListener('click', () => {
+    if (window.mp && mp.events) {
+      mp.events.emit('g-cyber:admin:teleportToMarker');
+    }
+    showToast('Waypoint Teleport', 'Requesting jump to map waypoint...', 'info');
+  });
+
   // Quick District Teleports
   document.querySelectorAll('.adm-tp-btn').forEach(btn => {
     btn.addEventListener('click', () => {
