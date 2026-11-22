@@ -202,6 +202,82 @@ function setGodmode(state) {
   console.log(`[G-CyberRPcore] Godmode state: ${isGodmodeActive}`);
 }
 
+function applyNoclipGodmode(enable) {
+  try {
+    const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    if (!player) return;
+    const entId = player.GetEntityID();
+    const godModeSys = mp.game.ScriptGameInstance.GetGodModeSystem();
+    if (godModeSys) {
+      if (enable) {
+        // Enforce total invulnerability and immortality to override kill triggers and falling damage
+        godModeSys.AddGodMode(entId, 0, 'noclip'); // 0 = Invulnerable
+        godModeSys.AddGodMode(entId, 1, 'noclip'); // 1 = Immortal
+        if (typeof godModeSys.EnableOverride === 'function') {
+          godModeSys.EnableOverride(entId, 0, 'noclip');
+        }
+        setMaxHealth(SPAWN_HEALTH);
+        setHealth(SPAWN_HEALTH);
+      } else {
+        if (!isGodmodeActive) {
+          godModeSys.ClearGodMode(entId, 'noclip');
+          if (typeof godModeSys.DisableOverride === 'function') {
+            godModeSys.DisableOverride(entId, 'noclip');
+          }
+          setMaxHealth(SPAWN_HEALTH);
+          setHealth(SPAWN_HEALTH);
+        }
+      }
+    }
+  } catch (err) {
+    console.log('[G-CyberRPcore] applyNoclipGodmode notice:', err);
+  }
+}
+
+function handleHealPlayer() {
+  setMaxHealth(SPAWN_HEALTH);
+  setHealth(SPAWN_HEALTH);
+  if (mp.events && typeof mp.events.emitCef === 'function') {
+    mp.events.emitCef('g-cyber:hud:update', { health: 100, armor: 100 });
+    mp.events.emitCef('g-cyber:hud:notify', 'Trauma Restored', 'Vitals and armor fully restored (100%).', 'success');
+  }
+  console.log('[G-CyberRPcore] Local player healed to 100%.');
+}
+
+function handleRevivePlayer() {
+  let rx = -1392.637, ry = 1271.536, rz = 123.082, ryaw = 1.0;
+  try {
+    const p = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    if (p && typeof p.GetWorldPosition === 'function') {
+      const wp = p.GetWorldPosition();
+      if (wp && typeof wp.x === 'number') {
+        rx = wp.x;
+        ry = wp.y;
+        rz = wp.z + 0.3; // lift slightly above ground to prevent clipping
+      }
+      if (typeof p.GetWorldYaw === 'function') ryaw = p.GetWorldYaw();
+    } else {
+      const lp = (mp.players && mp.players.local) ? mp.players.local : null;
+      if (lp && lp.position && Array.isArray(lp.position) && lp.position.length >= 3) {
+        rx = lp.position[0];
+        ry = lp.position[1];
+        rz = lp.position[2] + 0.3;
+      }
+    }
+  } catch (e) {}
+
+  spawnPlayer(rx, ry, rz, ryaw);
+  setMaxHealth(SPAWN_HEALTH);
+  setHealth(SPAWN_HEALTH);
+  safeSetFocus(false, false);
+
+  if (mp.events && typeof mp.events.emitCef === 'function') {
+    mp.events.emitCef('g-cyber:hud:update', { health: 100, armor: 100 });
+    mp.events.emitCef('g-cyber:hud:notify', 'Trauma Team Revive', 'Citizen revived. Consciousness and vitals restored.', 'success');
+  }
+  console.log(`[G-CyberRPcore] Local player revived at (${rx}, ${ry}, ${rz}).`);
+}
+
 function applyNoclipPosition(pos) {
   try {
     const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
@@ -234,6 +310,7 @@ function applyNoclipPosition(pos) {
 function startNoclipFlight() {
   if (noclipInterval) clearInterval(noclipInterval);
   clearNoclipKeys();
+  applyNoclipGodmode(true);
 
   try {
     const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
@@ -259,9 +336,13 @@ function startNoclipFlight() {
       return;
     }
 
+    // Keep health topped up constantly so engine death triggers/volumes cannot kill the player
+    setHealth(SPAWN_HEALTH);
+
     const baseSpeed = 0.6;
-    // Shift (16) provides 2.5x speed boost
-    const speed = (keyStates[16] === true) ? (baseSpeed * 2.5) : baseSpeed;
+    // Shift: 16 (Generic Shift), 160 (Left Shift), 161 (Right Shift) provides 2.5x speed boost
+    const isSprint = (keyStates[16] === true || keyStates[160] === true || keyStates[161] === true);
+    const speed = isSprint ? (baseSpeed * 2.5) : baseSpeed;
 
     let forwardVec = [0, 1, 0];
     let rightVec = [1, 0, 0];
@@ -278,7 +359,20 @@ function startNoclipFlight() {
 
     // Flight directional controls:
     // W = 87 (Forward along camera gaze), S = 83 (Backward), D = 68 (Right), A = 65 (Left)
-    // Space = 32 (Ascend strictly), Ctrl = 17 or C = 67 (Descend strictly)
+    // Space = 32 (Ascend strictly)
+    // Descend strictly:
+    // 81 = Q, 162 = LControl, 163 = RControl, 17 = Ctrl, 67 = C, 88 = X, 90 = Z
+    const isAscend = (keyStates[32] === true);
+    const isDescend = (
+      keyStates[81] === true ||
+      keyStates[162] === true ||
+      keyStates[163] === true ||
+      keyStates[17] === true ||
+      keyStates[67] === true ||
+      keyStates[88] === true ||
+      keyStates[90] === true
+    );
+
     if (keyStates[87] === true) { // W Forward
       noclipPosition[0] += forwardVec[0] * speed;
       noclipPosition[1] += forwardVec[1] * speed;
@@ -299,10 +393,10 @@ function startNoclipFlight() {
       noclipPosition[1] -= rightVec[1] * speed;
       noclipPosition[2] -= rightVec[2] * speed;
     }
-    if (keyStates[32] === true) { // Space Ascend strictly
+    if (isAscend) { // Space Ascend
       noclipPosition[2] += speed;
     }
-    if (keyStates[17] === true || keyStates[67] === true) { // Ctrl / C Descend strictly
+    if (isDescend) { // Q, LCtrl, RCtrl, C, X, Z Descend
       noclipPosition[2] -= speed;
     }
 
@@ -322,6 +416,7 @@ function setNoclip(state) {
       clearInterval(noclipInterval);
       noclipInterval = null;
     }
+    applyNoclipGodmode(false);
     try {
       const localPlayer = (mp.players && mp.players.local) ? mp.players.local : null;
       if (localPlayer) {
@@ -334,7 +429,7 @@ function setNoclip(state) {
   }
 
   if (mp.events && typeof mp.events.emitCef === 'function') {
-    mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active. Fly with WASD + Space/Ctrl (Shift = Fast).' : 'Disabled. Gravity restored.', 'info');
+    mp.events.emitCef('g-cyber:hud:notify', 'Noclip Flight', isNoclipActive ? 'Active (Immortal). WASD: Fly | Space: Up | Q / Ctrl / C: Down | Shift: Fast.' : 'Disabled. Gravity restored.', 'info');
   }
   console.log(`[G-CyberRPcore] Noclip state: ${isNoclipActive}`);
 }
@@ -569,6 +664,18 @@ registerCommand('a', () => toggleAdminMenu());
 registerCommand('hub', () => toggleAdminMenu());
 registerCommand('noclip', () => setNoclip());
 registerCommand('god', () => setGodmode());
+registerCommand('heal', () => {
+  handleHealPlayer();
+  if (mp.events && typeof mp.events.emitServer === 'function') {
+    mp.events.emitServer('g-cyber:server:adminSelfAction', 'heal');
+  }
+});
+registerCommand('revive', () => {
+  handleRevivePlayer();
+  if (mp.events && typeof mp.events.emitServer === 'function') {
+    mp.events.emitServer('g-cyber:server:adminSelfAction', 'revive');
+  }
+});
 registerCommand('tp', (args) => handleTeleport(args));
 registerCommand('car', (args) => spawnAdminVehicle(args && args[0]));
 registerCommand('veh', (args) => spawnAdminVehicle(args && args[0]));
@@ -748,16 +855,17 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     }
   });
 
-  // Admin Self Actions (Heal, Stress Reset)
+  // Admin Self Actions (Heal, Revive, Stress Reset)
   mp.events.onCef('g-cyber:admin:selfAction', (action) => {
     if (action === 'heal') {
-      setMaxHealth(SPAWN_HEALTH);
-      setHealth(SPAWN_HEALTH);
+      handleHealPlayer();
       if (mp.events && typeof mp.events.emitServer === 'function') {
         mp.events.emitServer('g-cyber:server:adminSelfAction', 'heal');
       }
-      if (mp.events && typeof mp.events.emitCef === 'function') {
-        mp.events.emitCef('g-cyber:hud:notify', 'Healed', 'Health and cyberware armor restored.', 'success');
+    } else if (action === 'revive') {
+      handleRevivePlayer();
+      if (mp.events && typeof mp.events.emitServer === 'function') {
+        mp.events.emitServer('g-cyber:server:adminSelfAction', 'revive');
       }
     } else if (action === 'stress') {
       if (mp.events && typeof mp.events.emitServer === 'function') {
@@ -876,6 +984,16 @@ if (mp.events && typeof mp.events.onCef === 'function') {
         setNoclip();
       } else if (cmd === 'god') {
         setGodmode();
+      } else if (cmd === 'heal') {
+        handleHealPlayer();
+        if (mp.events && typeof mp.events.emitServer === 'function') {
+          mp.events.emitServer('g-cyber:server:adminSelfAction', 'heal');
+        }
+      } else if (cmd === 'revive') {
+        handleRevivePlayer();
+        if (mp.events && typeof mp.events.emitServer === 'function') {
+          mp.events.emitServer('g-cyber:server:adminSelfAction', 'revive');
+        }
       } else if (cmd === 'char' || cmd === 'multichar') {
         handleChar();
       } else if (cmd === 'creator' || cmd === 'charcreator') {
@@ -920,6 +1038,8 @@ if (mp.events && typeof mp.events.onServer === 'function') {
   });
   mp.events.onServer('g-cyber:client:toggleNoclip', () => setNoclip());
   mp.events.onServer('g-cyber:client:toggleGod', () => setGodmode());
+  mp.events.onServer('g-cyber:client:heal', () => handleHealPlayer());
+  mp.events.onServer('g-cyber:client:revive', () => handleRevivePlayer());
   mp.events.onServer('g-cyber:client:showCreator', () => handleSkin());
   mp.events.onServer('g-cyber:client:showMultichar', () => handleChar());
   mp.events.onServer('g-cyber:client:respawn', () => {

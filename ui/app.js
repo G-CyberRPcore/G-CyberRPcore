@@ -976,7 +976,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.mp && mp.events) {
       mp.events.emit('g-cyber:admin:toggleSelf', 'noclip', e.target.checked);
     }
-    showToast('Noclip Flight', e.target.checked ? 'Noclip active. Use WASD + Space/Shift to fly.' : 'Noclip disabled.', 'info');
+    showToast('Noclip Flight', e.target.checked ? 'Noclip active (Immortal). WASD: Fly | Space: Up | Q / Ctrl / C: Down | Shift: Fast.' : 'Noclip disabled.', 'info');
   });
 
   document.getElementById('btn-self-heal').addEventListener('click', () => {
@@ -985,7 +985,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setDialPercentage('ring-health-fill', 'health-val', 100);
     setDialPercentage('ring-armor-fill', 'armor-val', 100);
-    showToast('Self Restored', 'Health and cyberware armor maxed.', 'success');
+    showToast('Self Restored', 'Health and cyberware armor maxed (100%).', 'success');
+  });
+
+  document.getElementById('btn-self-revive')?.addEventListener('click', () => {
+    if (window.mp && mp.events) {
+      mp.events.emit('g-cyber:admin:selfAction', 'revive');
+    }
+    setDialPercentage('ring-health-fill', 'health-val', 100);
+    setDialPercentage('ring-armor-fill', 'armor-val', 100);
+    showToast('Self Revived', 'Trauma Team resurrected player puppet.', 'success');
   });
 
   document.getElementById('btn-self-stress').addEventListener('click', () => {

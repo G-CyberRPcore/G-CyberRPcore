@@ -234,6 +234,23 @@ mp.events.onClient('g-cyber:server:adminPlayerAction', (player, action, targetId
       break;
 
     case 'revive':
+      target.health = 100;
+      if (targetCore) {
+        if (targetCore.Functions && typeof targetCore.Functions.SetMetaData === 'function') {
+          targetCore.Functions.SetMetaData('health', 100);
+          targetCore.Functions.SetMetaData('armor', 100);
+        }
+        if (targetCore.Functions && typeof targetCore.Functions.SyncHUD === 'function') {
+          targetCore.Functions.SyncHUD();
+        } else if (typeof targetCore.SyncHUD === 'function') {
+          targetCore.SyncHUD();
+        }
+      }
+      target.emit('g-cyber:client:revive');
+      player.emit('g-cyber:client:notify', 'Revived', `Player #${targetId} was revived successfully.`, 'success');
+      target.emit('g-cyber:client:notify', 'Trauma Team Revive', 'You were revived by Trauma Admin.', 'success');
+      break;
+
     case 'heal':
       target.health = 100;
       if (targetCore) {
@@ -247,6 +264,7 @@ mp.events.onClient('g-cyber:server:adminPlayerAction', (player, action, targetId
           targetCore.SyncHUD();
         }
       }
+      target.emit('g-cyber:client:heal');
       player.emit('g-cyber:client:notify', 'Healed', `Player #${targetId} health restored to 100%`, 'success');
       target.emit('g-cyber:client:notify', 'Healed', 'Your vitals were restored by Trauma Admin.', 'success');
       break;
@@ -277,7 +295,7 @@ mp.events.onClient('g-cyber:server:adminSelfAction', (player, action) => {
   if (!isPlayerAdmin(player)) return;
   const coreP = G_CyberCore.Functions.GetPlayer(player.id);
 
-  if (action === 'heal') {
+  if (action === 'heal' || action === 'revive') {
     player.health = 100;
     if (coreP) {
       if (coreP.Functions && typeof coreP.Functions.SetMetaData === 'function') {
@@ -289,6 +307,11 @@ mp.events.onClient('g-cyber:server:adminSelfAction', (player, action) => {
       } else if (typeof coreP.SyncHUD === 'function') {
         coreP.SyncHUD();
       }
+    }
+    if (action === 'revive') {
+      player.emit('g-cyber:client:revive');
+    } else {
+      player.emit('g-cyber:client:heal');
     }
   } else if (action === 'stress') {
     if (coreP) {
