@@ -63,6 +63,7 @@ REPOS=(
     "gcyber-loading|https://github.com/G-CyberRPcore/gcyber-loading.git|Cyberpunk Neural Loading Screen|false"
     "gcyber-hud|https://github.com/G-CyberRPcore/gcyber-hud.git|Circular Status Gauges & Speedometer|false"
     "gcyber-multicharacter|https://github.com/G-CyberRPcore/gcyber-multicharacter.git|4-Slot Character Selection Roster|false"
+    "gcyber-inventory|https://github.com/G-CyberRPcore/gcyber-inventory.git|Multi-Container Drag & Drop Inventory|false"
 )
 
 test_prerequisites() {

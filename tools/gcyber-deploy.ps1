@@ -101,6 +101,14 @@ $OfficialRepos = @(
         Description = "4-Slot Character Selection Roster & In-Game Deletion"
         Required    = $true
         HasNpm      = $false
+    },
+    @{
+        Name        = "gcyber-inventory"
+        Url         = "https://github.com/G-CyberRPcore/gcyber-inventory.git"
+        Path        = Join-Path $ResourcesDir "gcyber-inventory"
+        Description = "Multi-Container Drag & Drop Inventory, Hotbar & Cyberware"
+        Required    = $true
+        HasNpm      = $false
     }
 )
 
