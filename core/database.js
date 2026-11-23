@@ -28,11 +28,10 @@ try {
   };
 }
 
-// Locate databases directory (support running from D:\cybermpserver or D:\G-CyberRPcore)
+// Locate databases directory dynamically across different workspace structures
 function resolveDbFile(filename) {
   const candidateDirs = [
     path.join(process.cwd(), 'database'),
-    path.join('D:\\cybermpserver', 'database'),
     path.join(__dirname, '..', 'database'),
     path.join(__dirname, '..', '..', '..', 'database')
   ];
@@ -44,9 +43,17 @@ function resolveDbFile(filename) {
   return path.join(process.cwd(), 'database', filename);
 }
 
-const DB_DIR = fs.existsSync(path.join('D:\\cybermpserver', 'database'))
-  ? path.join('D:\\cybermpserver', 'database')
-  : path.join(process.cwd(), 'database');
+const DB_DIR = (function() {
+  const candidateDirs = [
+    path.join(process.cwd(), 'database'),
+    path.join(__dirname, '..', 'database'),
+    path.join(__dirname, '..', '..', '..', 'database')
+  ];
+  for (const d of candidateDirs) {
+    if (fs.existsSync(d)) return d;
+  }
+  return path.join(process.cwd(), 'database');
+})();
 
 const PLAYERS_FILE = resolveDbFile('players.json');
 const VEHICLES_FILE = resolveDbFile('vehicles.json');

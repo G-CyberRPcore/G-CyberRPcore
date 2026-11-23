@@ -85,7 +85,7 @@ The automated deployer inspects your environment, clones all official decoupled 
 
 1. **Clone G-CyberRPcore** into your server's `resources/` directory:
    ```cmd
-   cd C:\path\to\cybermpserver\resources
+   cd \path\to\cybermpserver\resources
    git clone https://github.com/G-CyberRPcore/G-CyberRPcore.git G-CyberRPcore
    ```
 

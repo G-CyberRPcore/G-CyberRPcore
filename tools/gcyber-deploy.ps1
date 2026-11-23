@@ -31,10 +31,15 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Smart directory resolver: check if running from server root or subfolder (e.g. tools/)
 if (-not (Test-Path (Join-Path $ScriptDir "cybermp-server.exe"))) {
     $parentDir = Split-Path -Parent $ScriptDir
+    $grandParentDir = Split-Path -Parent $parentDir
+    $cwd = (Get-Location).Path
+
     if (Test-Path (Join-Path $parentDir "cybermp-server.exe")) {
         $ScriptDir = $parentDir
-    } elseif (Test-Path "d:\cybermpserver\cybermp-server.exe") {
-        $ScriptDir = "d:\cybermpserver"
+    } elseif (Test-Path (Join-Path $grandParentDir "cybermp-server.exe")) {
+        $ScriptDir = $grandParentDir
+    } elseif (Test-Path (Join-Path $cwd "cybermp-server.exe")) {
+        $ScriptDir = $cwd
     }
 }
 Set-Location -Path $ScriptDir
@@ -47,7 +52,22 @@ $ServerToml = Join-Path $ScriptDir "server.toml"
 $ResourcesDir = Join-Path $ScriptDir "resources"
 $CacheDir = Join-Path $ScriptDir "cache"
 $DatabaseDir = Join-Path $ScriptDir "database"
-$CefCacheDir = "E:\ProgramData\cybermp\resources\mp\cache\cef-cache"
+
+# Resolve CEF cache dynamically using standard environment variables
+$CefCacheDir = $null
+$potentialCefPaths = @()
+if ($env:ProgramData) {
+    $potentialCefPaths += Join-Path $env:ProgramData "cybermp\resources\mp\cache\cef-cache"
+}
+if ($env:LOCALAPPDATA) {
+    $potentialCefPaths += Join-Path $env:LOCALAPPDATA "cybermp\cache\cef-cache"
+}
+foreach ($p in $potentialCefPaths) {
+    if ($p -and (Test-Path $p)) {
+        $CefCacheDir = $p
+        break
+    }
+}
 
 $OfficialRepos = @(
     @{
@@ -468,7 +488,7 @@ function Clear-ServerCache {
     }
 
     # Clear CEF cache
-    if (Test-Path $CefCacheDir) {
+    if ($CefCacheDir -and (Test-Path $CefCacheDir)) {
         Remove-Item -Path "$CefCacheDir\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-CyberLog "SUCCESS" "Cleared client CEF cache: $CefCacheDir"
     }

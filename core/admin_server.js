@@ -246,8 +246,8 @@ class AdminServer {
   scanResources() {
     const candidateDirs = [
       path.join(process.cwd(), 'resources'),
-      path.join('D:\\cybermpserver', 'resources'),
-      path.join(__dirname, '..', '..')
+      path.join(__dirname, '..', '..'),
+      path.join(__dirname, '..')
     ];
 
     let resDir = null;

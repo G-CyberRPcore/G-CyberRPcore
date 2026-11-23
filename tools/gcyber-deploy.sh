@@ -14,8 +14,8 @@ if [[ ! -f "$SERVER_DIR/cybermp-server.exe" ]]; then
         SERVER_DIR="$(dirname "$SCRIPT_DIR")"
     elif [[ -f "$(dirname "$(dirname "$SCRIPT_DIR")")/cybermp-server.exe" ]]; then
         SERVER_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-    elif [[ -d "$HOME/cybermpserver" && -f "$HOME/cybermpserver/cybermp-server.exe" ]]; then
-        SERVER_DIR="$HOME/cybermpserver"
+    elif [[ -f "$(pwd)/cybermp-server.exe" ]]; then
+        SERVER_DIR="$(pwd)"
     fi
 fi
 
