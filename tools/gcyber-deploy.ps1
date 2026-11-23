@@ -111,17 +111,17 @@ function Write-CyberLog([string]$level, [string]$message) {
 
 function Show-CyberBanner {
     Clear-Host
-    Write-Color "╔═══════════════════════════════════════════════════════════════════════════════╗" -color Cyan
-    Write-Color "║       ____        ______      __                 ____  ____                   ║" -color Cyan
-    Write-Color "║      / ____      / ____/_  __/ /_  ___  _____   / __ \/ __ \_________  ________ ║" -color Cyan
-    Write-Color "║     / / __ _____/ /   / / / / __ \/ _ \/ ___/  / /_/ / /_/ / ___/ __ \/ ___/ _ \║" -color Yellow
-    Write-Color "║    / /_/ /_____/ /___/ /_/ / /_/ /  __/ /     / _, _/ ____/ /__/ /_/ / /  /  __/║" -color Yellow
-    Write-Color "║    \____/      \____/\__, /_.___/\___/_/     /_/ |_/_/    \___/\____/_/   \___/ ║" -color Cyan
-    Write-Color "║                     /____/                                                    ║" -color Cyan
-    Write-Color "║                                                                               ║" -color Cyan
-    Write-Color "║         CyberMP Dedicated Server Orchestrator & Auto-Deployer v1.0.0          ║" -color Green
-    Write-Color "║                   Night City REDengine Roleplay Framework                     ║" -color DarkCyan
-    Write-Color "╚═══════════════════════════════════════════════════════════════════════════════╝" -color Cyan
+    Write-Color '╔═══════════════════════════════════════════════════════════════════════════════╗' -color Cyan
+    Write-Color '║       ____        ______      __                 ____  ____                   ║' -color Cyan
+    Write-Color '║      / ____      / ____/_  __/ /_  ___  _____   / __ \/ __ \_________  ________ ║' -color Cyan
+    Write-Color '║     / / __ _____/ /   / / / / __ \/ _ \/ ___/  / /_/ / /_/ / ___/ __ \/ ___/ _ \║' -color Yellow
+    Write-Color '║    / /_/ /_____/ /___/ /_/ / /_/ /  __/ /     / _, _/ ____/ /__/ /_/ / /  /  __/║' -color Yellow
+    Write-Color '║    \____/      \____/\__, /_.___/\___/_/     /_/ |_/_/    \___/\____/_/   \___/ ║' -color Cyan
+    Write-Color '║                     /____/                                                    ║' -color Cyan
+    Write-Color '║                                                                               ║' -color Cyan
+    Write-Color '║         CyberMP Dedicated Server Orchestrator & Auto-Deployer v1.0.0          ║' -color Green
+    Write-Color '║                   Night City REDengine Roleplay Framework                     ║' -color DarkCyan
+    Write-Color '╚═══════════════════════════════════════════════════════════════════════════════╝' -color Cyan
     Write-Host ""
 }
 
