@@ -97,6 +97,11 @@ class G_CyberCoreEngine {
       mpPlayer.dimension = 0;
       mpPlayer.streamingRadius = 300;
 
+      // Ensure open-air street level spawn
+      if (!mpPlayer.position || mpPlayer.position.length < 3 || Math.abs((mpPlayer.position[2] || 0) - 123.0) < 3.0) {
+        mpPlayer.position = [-1375.0, 1245.0, 24.5];
+      }
+
       // Look up existing character or create new
       let rawData = db.GetPlayerByName(mpPlayer.nickname);
       const playerObj = new Player(mpPlayer, rawData || {});

@@ -1311,7 +1311,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeInventory() {
       playCyberSound('click');
       isInventoryOpen = false;
-      if (viewInventory) viewInventory.classList.add('hidden');
+      if (viewInventory) {
+        viewInventory.classList.add('hidden');
+        viewInventory.classList.remove('active');
+      }
       if (invItemModal) invItemModal.classList.add('hidden');
       if (window.mp && mp.events) {
         mp.events.emit('gcyber:inventory:cefCloseWindow');
@@ -1321,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnCloseInv) btnCloseInv.addEventListener('click', closeInventory);
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' || e.key === 'Tab') {
+      if (e.key === 'Escape' || e.key === 'Tab' || e.key === 'i' || e.key === 'I') {
         if (isInventoryOpen) {
           e.preventDefault();
           closeInventory();
@@ -1644,7 +1647,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderInventoryUI();
         isInventoryOpen = true;
-        if (viewInventory) viewInventory.classList.remove('hidden');
+        if (viewInventory) {
+          viewInventory.classList.remove('hidden');
+          viewInventory.classList.add('active');
+        }
         playCyberSound('use');
       } catch (e) {
         console.error('[G-CyberRPcore] cefOpen parse error:', e);
@@ -1670,7 +1676,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     mp.events.on('gcyber:inventory:cefClose', () => {
       isInventoryOpen = false;
-      if (viewInventory) viewInventory.classList.add('hidden');
+      if (viewInventory) {
+        viewInventory.classList.add('hidden');
+        viewInventory.classList.remove('active');
+      }
       if (invItemModal) invItemModal.classList.add('hidden');
     });
 

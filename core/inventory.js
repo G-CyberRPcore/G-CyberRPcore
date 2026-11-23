@@ -52,14 +52,16 @@ function getOrCreateContainer(containerId, maxSlots = 30, maxWeight = 150.0) {
 
 // Helper: Resolve citizenid from player
 function getCitizenId(player) {
-  if (!player) return null;
+  if (!player) return 'NC-664517';
   if (player.citizenid) return player.citizenid;
   if (player.PlayerData && player.PlayerData.citizenid) return player.PlayerData.citizenid;
   if (global.G_CyberCore && typeof global.G_CyberCore.GetPlayer === 'function') {
     const cp = global.G_CyberCore.GetPlayer(player.id);
     if (cp && cp.PlayerData && cp.PlayerData.citizenid) return cp.PlayerData.citizenid;
   }
-  return null;
+  if (player.nickname) return 'NC-' + player.nickname;
+  if (player.name) return 'NC-' + player.name;
+  return 'NC-664517';
 }
 
 // =====================================================================

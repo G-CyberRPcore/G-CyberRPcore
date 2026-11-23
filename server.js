@@ -12,8 +12,8 @@ console.log('[G-CyberRPcore] Server runtime initialized. Framework active.');
 // In-Memory Admin Registry & Active Characters Cache
 const ADMIN_PLAYERS = new Set([0, 1]); // Player ID 0 (Host) & 1 are default admins
 
-// Default Spawn: Megabuilding H10 Atrium Hallway (Watson, Little China - open walkway, elevators, shops)
-const DEFAULT_SPAWN = [-1382.0, 1272.0, 123.0];
+// Default Spawn: Watson, Little China Street Plaza (Open street with zero doors/interiors)
+const DEFAULT_SPAWN = [-1375.0, 1245.0, 24.5];
 const STREET_SPAWN = [-1375.0, 1245.0, 24.5];
 
 // Helper: Get Player Identification Key (License / IP / Nickname)
@@ -501,14 +501,21 @@ mp.events.on('playerConnected', (playerId, tempId) => {
   const player = mp.players.at(playerId);
   if (!player) return;
   console.log(`[G-CyberRPcore] Citizen ${player.nickname || 'Unknown'} (ID #${playerId}) connected.`);
+  player.position = DEFAULT_SPAWN;
+  player.dimension = 0;
   if (mp.events && typeof mp.events.emitClient === 'function') {
-    mp.events.emitClient(playerId, 'chat:add', '[G-CyberRPcore] Welcome to Night City. Press F10 for Admin Menu, or type /admin in console.', 'system');
+    mp.events.emitClient(playerId, 'chat:add', '[G-CyberRPcore] Welcome to Night City. Press F10 for Admin Menu, Tab for Inventory.', 'system');
   }
 });
 
 mp.events.on('playerSpawn', (playerId) => {
   const player = mp.players.at(playerId);
-  console.log(`[G-CyberRPcore] Citizen #${playerId} spawned in world.`);
+  if (player) {
+    if (!player.position || player.position.length < 3 || Math.abs(player.position[2] - 123.0) < 3.0) {
+      player.position = DEFAULT_SPAWN;
+    }
+  }
+  console.log(`[G-CyberRPcore] Citizen #${playerId} spawned in world at open street level.`);
 });
 
 // Lua bridge for admin menu toggle

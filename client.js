@@ -10,6 +10,9 @@ console.log('[G-CyberRPcore] Master Client Subsystem Initializing...');
 if (mp.cef && typeof mp.cef.setUrl === 'function') {
   try {
     mp.cef.setUrl('./ui/index.html');
+    if (typeof mp.cef.setFocus === 'function') {
+      mp.cef.setFocus(true, true);
+    }
   } catch (err) {
     console.log('[G-CyberRPcore] mp.cef.setUrl notice:', err);
   }
@@ -58,7 +61,7 @@ const SPAWN_HEALTH = 300;
 // Coordinate Presets for Quick Teleport
 const DISTRICT_COORDS = {
   corpo_plaza: [-210.0, -580.0, 42.0],
-  megabuilding_h10: [-1392.637, 1271.536, 123.082],
+  megabuilding_h10: [-1375.0, 1245.0, 24.5],
   afterlife: [-1280.0, 1150.0, 22.0],
   pacifica_pier: [-2200.0, -1850.0, 15.0],
   santo_domingo: [450.0, -1200.0, 30.0],
@@ -130,7 +133,7 @@ function setMaxHealth(value) {
   }
 }
 
-function spawnPlayer(x = -1382.0, y = 1272.0, z = 123.0, yaw = 90.0) {
+function spawnPlayer(x = -1375.0, y = 1245.0, z = 24.5, yaw = 90.0) {
   console.log(`[G-CyberRPcore] Spawning player at (${x}, ${y}, ${z}, yaw: ${yaw})...`);
   setMaxHealth(SPAWN_HEALTH);
   setHealth(SPAWN_HEALTH);
@@ -203,6 +206,21 @@ function toggleInventory(forceState) {
     const containerReq = getNearbyVehicleContainer();
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('gcyber:inventory:serverOpen', JSON.stringify(containerReq));
+    }
+    // Instant CEF response so user never sees a blank delay
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('gcyber:inventory:cefOpen', JSON.stringify({
+        player: {
+          citizenid: 'SYNCING...',
+          name: 'CITIZEN POCKETS',
+          maxSlots: 35,
+          maxWeight: 120.0,
+          weight: 0.0,
+          items: []
+        },
+        container: containerReq ? { label: containerReq.label, id: containerReq.id, items: [] } : null,
+        itemDefinitions: {}
+      }));
     }
   } else {
     if (mp.events && typeof mp.events.emitCef === 'function') {

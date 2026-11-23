@@ -78,10 +78,11 @@ Config.Economy = {
 // 5. World Spawns & Dimensions
 // =====================================================================
 Config.Spawns = {
-  // Megabuilding H10 Atrium Hallway (Watson, Little China - open walkway, elevators, shops)
-  default: [-1382.0, 1272.0, 123.0],
+  // Watson, Little China Street Plaza (Open street with zero doors/interiors)
+  default: [-1375.0, 1245.0, 24.5],
+  street: [-1375.0, 1245.0, 24.5],
   // Trauma Team Medical Center / Hospital Respawn
-  hospital: [-1408.2, 1285.4, 123.0]
+  hospital: [-1375.0, 1245.0, 24.5]
 };
 
 // =====================================================================
