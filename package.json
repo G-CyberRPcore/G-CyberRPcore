@@ -4,7 +4,7 @@
   "description": "The Definitive Modular Roleplay Framework for Cyberpunk 2077 (CyberMP)",
   "main": "server.js",
   "scripts": {
-    "test": "node --check server.js && node --check client.js && node --check core/index.js && node --check core/player.js"
+    "test": "node --check server.js && node --check client.js && node --check config.js && node --check core/index.js && node --check core/player.js && node --check core/database.js && node --check core/admin_server.js"
   },
   "repository": {
     "type": "git",
@@ -26,5 +26,8 @@
   "homepage": "https://github.com/G-CyberRPcore",
   "devDependencies": {
     "@cybermp-community/client-types": "^2.6.1"
+  },
+  "dependencies": {
+    "mysql2": "^3.24.6"
   }
 }

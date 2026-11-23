@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G-CyberAdmin // Night City Server Grid</title>
+  <style>
+    :root {
+      --bg-dark: #0a0b10;
+      --bg-panel: #11141e;
+      --bg-card: #181d2c;
+      --border-color: #232b3e;
+      --neon-cyan: #00f0ff;
+      --neon-yellow: #fcee0a;
+      --neon-red: #ff003c;
+      --neon-green: #00ff75;
+      --text-main: #e2e8f0;
+      --text-muted: #8892b0;
+      --font-mono: 'Consolas', 'Courier New', monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Scanline effect */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0.35;
+    }
+
+    /* Header */
+    header {
+      background-color: var(--bg-panel);
+      border-bottom: 2px solid var(--neon-cyan);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      box-shadow: 0 4px 20px rgba(0, 240, 255, 0.15);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--neon-cyan), var(--neon-yellow));
+      clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    }
+
+    .brand-title {
+      font-family: var(--font-mono);
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: var(--text-main);
+    }
+
+    .brand-title span {
+      color: var(--neon-cyan);
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .nav-btn:hover {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+
+    .nav-btn.active {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(0, 255, 117, 0.1);
+      border: 1px solid var(--neon-green);
+      color: var(--neon-green);
+      font-weight: bold;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--neon-green);
+      box-shadow: 0 0 8px var(--neon-green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-content {
+      display: none;
+      height: 100%;
+    }
+
+    .tab-content.active {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .metric-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-left: 4px solid var(--neon-cyan);
+      border-radius: 4px;
+      padding: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .metric-card.yellow { border-left-color: var(--neon-yellow); }
+    .metric-card.green { border-left-color: var(--neon-green); }
+    .metric-card.red { border-left-color: var(--neon-red); }
+
+    .metric-title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: #fff;
+    }
+
+    .metric-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Quick Action Buttons */
+    .action-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      padding: 16px;
+      border-radius: 4px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+
+    .btn-primary {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    .btn-warning {
+      background: rgba(252, 238, 10, 0.15);
+      border-color: var(--neon-yellow);
+      color: var(--neon-yellow);
+    }
+
+    .btn-danger {
+      background: rgba(255, 0, 60, 0.15);
+      border-color: var(--neon-red);
+      color: var(--neon-red);
+    }
+
+    .btn-danger:hover {
+      background: var(--neon-red);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(255, 0, 60, 0.4);
+    }
+
+    /* Console Terminal */
+    .console-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      background: #050608;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+      min-height: 480px;
+    }
+
+    .console-header {
+      background: #0f1118;
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .console-header-title {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--neon-cyan);
+      font-weight: bold;
+    }
+
+    .console-body {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-line {
+      word-break: break-all;
+    }
+
+    .log-info { color: #a0aec0; }
+    .log-warn { color: var(--neon-yellow); }
+    .log-error { color: var(--neon-red); font-weight: bold; }
+    .log-success { color: var(--neon-green); }
+    .log-system { color: var(--neon-cyan); }
+
+    .console-footer {
+      display: flex;
+      border-top: 1px solid var(--border-color);
+      background: #0b0d13;
+    }
+
+    .console-prompt {
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      color: var(--neon-cyan);
+      font-weight: bold;
+    }
+
+    .console-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      padding: 12px 0;
+    }
+
+    /* Tables */
+    .table-container {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: #0e111a;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      color: var(--neon-cyan);
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    tr:hover td {
+      background: rgba(0, 240, 255, 0.03);
+    }
+
+    .badge {
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: bold;
+      display: inline-block;
+    }
+
+    .badge-cyan { background: rgba(0, 240, 255, 0.15); color: var(--neon-cyan); border: 1px solid var(--neon-cyan); }
+    .badge-yellow { background: rgba(252, 238, 10, 0.15); color: var(--neon-yellow); border: 1px solid var(--neon-yellow); }
+    .badge-green { background: rgba(0, 255, 117, 0.15); color: var(--neon-green); border: 1px solid var(--neon-green); }
+
+    /* Modal / Alert Banner */
+    .alert-banner {
+      padding: 10px 16px;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid var(--neon-cyan);
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      color: var(--neon-cyan);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo"></div>
+      <div class="brand-title">G-CYBER<span>ADMIN</span></div>
+      <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono); margin-left:8px;">[NODE: REDengine 2077]</span>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="nav-btn" onclick="switchTab('console')">Live Console</button>
+      <button class="nav-btn" onclick="switchTab('players')">Citizens (<span id="tab-playercount">0</span>)</button>
+      <button class="nav-btn" onclick="switchTab('resources')">Resources</button>
+      <button class="nav-btn" onclick="switchTab('database')">Database (MySQL)</button>
+    </div>
+
+    <div class="header-status">
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span>SERVER ONLINE</span>
+      </div>
+      <div id="clock" style="color:var(--text-muted);">--:--:--</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Tab 1: Dashboard -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="alert-banner">
+        <div><strong>G-CyberRPcore Framework v1.0.0</strong> - CyberMP Dedicated Server Node active on port 2078.</div>
+        <div id="uptime-text">Uptime: 00:00:00</div>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card green">
+          <div class="metric-title">Active Citizens</div>
+          <div class="metric-value" id="metric-players">0</div>
+          <div class="metric-sub">Connected in Night City</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-title">Database DAL Engine</div>
+          <div class="metric-value" id="metric-db-driver" style="font-size:1.4rem;">MYSQL (3307)</div>
+          <div class="metric-sub" id="metric-db-status">Status: Connected</div>
+        </div>
+
+        <div class="metric-card yellow">
+          <div class="metric-title">RAM Usage</div>
+          <div class="metric-value" id="metric-ram">0 MB</div>
+          <div class="metric-sub" id="metric-ram-sub">Process RSS</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-title">Registered Citizens in DB</div>
+          <div class="metric-value" id="metric-db-records">0</div>
+          <div class="metric-sub">Stored in SQL Database</div>
+        </div>
+      </div>
+
+      <div class="action-panel">
+        <span style="font-family:var(--font-mono); font-size:0.85rem; color:var(--text-muted); margin-right:8px;">GLOBAL ACTIONS:</span>
+        <button class="btn btn-primary" onclick="executeCommand('reviveall')">Revive All Citizens</button>
+        <button class="btn btn-warning" onclick="executeCommand('healall')">Heal All Citizens</button>
+        <button class="btn" onclick="broadcastPrompt()">Broadcast Announcement</button>
+        <button class="btn btn-danger" onclick="executeCommand('resync')">Resync Game World</button>
+      </div>
+
+      <div class="table-container" style="flex:1;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Citizen Name</th>
+              <th>Citizen ID</th>
+              <th>Job</th>
+              <th>Cash</th>
+              <th>Bank</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="quick-players-tbody">
+            <tr>
+              <td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">No citizens currently connected.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: Live Console -->
+    <div id="tab-console" class="tab-content">
+      <div class="console-container">
+        <div class="console-header">
+          <div class="console-header-title">LIVE STREAM TERMINAL // STDOUT & STDERR</div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="clearConsole()">Clear</button>
+            <button class="btn" style="padding:4px 8px; font-size:0.75rem;" id="toggle-autoscroll" onclick="toggleAutoScroll()">AutoScroll: ON</button>
+          </div>
+        </div>
+        <div class="console-body" id="console-output">
+          <div class="log-line log-system">[G-CyberAdmin] Console stream initializing...</div>
+        </div>
+        <div class="console-footer">
+          <div class="console-prompt">&gt;</div>
+          <input type="text" id="console-cmd-input" class="console-input" placeholder="Type server command (e.g. heal 0, revive 0, tpm, status) and press Enter..." autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Citizens / Players -->
+    <div id="tab-players" class="tab-content">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <input type="text" id="player-search" placeholder="Search citizens by Name or CitizenID..." style="background:var(--bg-panel); border:1px solid var(--border-color); color:#fff; padding:8px 12px; border-radius:4px; font-family:var(--font-mono); width:320px;" oninput="renderPlayers()">
+        <button class="btn btn-primary" onclick="refreshPlayers()">Refresh List</button>
+      </div>
+
+      <div class="table-container" style="flex:1;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nickname</th>
+              <th>Citizen ID</th>
+              <th>Health</th>
+              <th>Job / Grade</th>
+              <th>Cash</th>
+              <th>Bank</th>
+              <th>Position</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="full-players-tbody">
+            <tr>
+              <td colspan="9" style="text-align:center; color:var(--text-muted); padding:32px;">Loading citizens...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 4: Resources -->
+    <div id="tab-resources" class="tab-content">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-family:var(--font-mono); font-size:0.9rem; color:var(--neon-cyan);">Installed Framework & Addon Resources</div>
+        <button class="btn btn-primary" onclick="refreshResources()">Scan Resources</button>
+      </div>
+
+      <div class="table-container" style="flex:1;">
+        <table>
+          <thead>
+            <tr>
+              <th>Resource Name</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Path</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="resources-tbody">
+            <tr>
+              <td colspan="5" style="text-align:center; color:var(--text-muted); padding:32px;">Loading resources...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 5: Database Manager -->
+    <div id="tab-database" class="tab-content">
+      <div class="alert-banner">
+        <div><strong>Unified Database Abstraction Layer (DAL)</strong> - Running Active Driver: <span id="db-driver-banner">MYSQL</span></div>
+        <button class="btn btn-primary" onclick="refreshDatabaseView()">Reload SQL Records</button>
+      </div>
+
+      <div class="table-container" style="flex:1;">
+        <table>
+          <thead>
+            <tr>
+              <th>Citizen ID</th>
+              <th>Name</th>
+              <th>Owner / Steam</th>
+              <th>Slot</th>
+              <th>Money (Cash / Bank)</th>
+              <th>Job</th>
+              <th>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody id="db-players-tbody">
+            <tr>
+              <td colspan="7" style="text-align:center; color:var(--text-muted); padding:32px;">Querying database table 'players'...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentTab = 'dashboard';
+    let autoScroll = true;
+    let cachedPlayers = [];
+    let commandHistory = [];
+    let historyIndex = -1;
+
+    // Clock
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString();
+    }, 1000);
+
+    function switchTab(tabName) {
+      currentTab = tabName;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+      const target = document.getElementById('tab-' + tabName);
+      if (target) target.classList.add('active');
+
+      const btn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.textContent.toLowerCase().includes(tabName));
+      if (btn) btn.classList.add('active');
+
+      if (tabName === 'players') refreshPlayers();
+      if (tabName === 'resources') refreshResources();
+      if (tabName === 'database') refreshDatabaseView();
+    }
+
+    // Live Metrics Polling
+    async function updateStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        
+        document.getElementById('metric-players').textContent = data.playerCount || 0;
+        document.getElementById('tab-playercount').textContent = data.playerCount || 0;
+        document.getElementById('metric-ram').textContent = `${Math.round(data.memory.rss / (1024 * 1024))} MB`;
+        document.getElementById('metric-db-driver').textContent = (data.database.driver || 'MYSQL').toUpperCase();
+        document.getElementById('metric-db-status').textContent = data.database.connected ? 'Status: Connected' : 'Status: Disconnected';
+        document.getElementById('metric-db-records').textContent = data.database.playersCount || 0;
+        document.getElementById('uptime-text').textContent = `Uptime: ${formatUptime(data.uptime)}`;
+        document.getElementById('db-driver-banner').textContent = (data.database.driver || 'MYSQL').toUpperCase();
+      } catch (err) {
+        console.error('Error polling status:', err);
+      }
+    }
+
+    function formatUptime(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    setInterval(updateStatus, 3000);
+    updateStatus();
+
+    // Players Management
+    async function refreshPlayers() {
+      try {
+        const res = await fetch('/api/players');
+        cachedPlayers = await res.json();
+        renderPlayers();
+      } catch (err) {
+        console.error('Error fetching players:', err);
+      }
+    }
+
+    function renderPlayers() {
+      const qTbody = document.getElementById('quick-players-tbody');
+      const fTbody = document.getElementById('full-players-tbody');
+      const search = (document.getElementById('player-search')?.value || '').toLowerCase();
+
+      const filtered = cachedPlayers.filter(p => {
+        if (!search) return true;
+        return (p.name && p.name.toLowerCase().includes(search)) ||
+               (p.citizenid && p.citizenid.toLowerCase().includes(search)) ||
+               (String(p.id).includes(search));
+      });
+
+      if (filtered.length === 0) {
+        const emptyHtml = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:24px;">No matching citizens connected.</td></tr>`;
+        qTbody.innerHTML = emptyHtml;
+        fTbody.innerHTML = emptyHtml;
+        return;
+      }
+
+      let qHtml = '';
+      let fHtml = '';
+
+      for (const p of filtered) {
+        const charName = (p.charinfo ? `${p.charinfo.firstname || ''} ${p.charinfo.lastname || ''}`.trim() : p.name) || 'Unknown';
+        const job = p.job ? (p.job.label || p.job.name || 'Civilian') : 'Civilian';
+        const cash = p.money ? (p.money.cash || 0) : 0;
+        const bank = p.money ? (p.money.bank || 0) : 0;
+        const health = p.health || 100;
+        const posStr = p.position ? `${Math.round(p.position[0])}, ${Math.round(p.position[1])}, ${Math.round(p.position[2])}` : 'N/A';
+
+        qHtml += `
+          <tr>
+            <td><strong>#${p.id}</strong></td>
+            <td>${charName}</td>
+            <td><span class="badge badge-cyan">${p.citizenid || 'N/A'}</span></td>
+            <td>${job}</td>
+            <td style="color:var(--neon-green);">$${cash.toLocaleString()}</td>
+            <td style="color:var(--neon-cyan);">$${bank.toLocaleString()}</td>
+            <td><span class="badge badge-green">HEALTH: ${health}%</span></td>
+            <td>
+              <button class="btn btn-warning" style="padding:2px 8px; font-size:0.75rem;" onclick="playerAction(${p.id}, 'heal')">Heal</button>
+              <button class="btn btn-primary" style="padding:2px 8px; font-size:0.75rem;" onclick="playerAction(${p.id}, 'revive')">Revive</button>
+              <button class="btn btn-danger" style="padding:2px 8px; font-size:0.75rem;" onclick="playerAction(${p.id}, 'kick')">Kick</button>
+            </td>
+          </tr>
+        `;
+
+        fHtml += `
+          <tr>
+            <td><strong>#${p.id}</strong></td>
+            <td>${p.name || 'Unknown'}</td>
+            <td><span class="badge badge-cyan">${p.citizenid || 'N/A'}</span></td>
+            <td><span class="badge ${health > 30 ? 'badge-green' : 'badge-yellow'}">${health}%</span></td>
+            <td>${job}</td>
+            <td style="color:var(--neon-green);">$${cash.toLocaleString()}</td>
+            <td style="color:var(--neon-cyan);">$${bank.toLocaleString()}</td>
+            <td style="font-family:var(--font-mono); font-size:0.75rem;">${posStr}</td>
+            <td>
+              <button class="btn btn-warning" style="padding:4px 8px; font-size:0.75rem;" onclick="playerAction(${p.id}, 'heal')">Heal</button>
+              <button class="btn btn-primary" style="padding:4px 8px; font-size:0.75rem;" onclick="playerAction(${p.id}, 'revive')">Revive</button>
+              <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="playerAction(${p.id}, 'tp_apartment')">TP Home</button>
+              <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="playerAction(${p.id}, 'kick')">Kick</button>
+            </td>
+          </tr>
+        `;
+      }
+
+      qTbody.innerHTML = qHtml;
+      fTbody.innerHTML = fHtml;
+    }
+
+    async function playerAction(id, action) {
+      if (action === 'kick') {
+        const reason = prompt('Kick reason:', 'Administrative decision');
+        if (!reason) return;
+        executeCommand(`kick ${id} ${reason}`);
+      } else if (action === 'heal') {
+        executeCommand(`heal ${id}`);
+      } else if (action === 'revive') {
+        executeCommand(`revive ${id}`);
+      } else if (action === 'tp_apartment') {
+        executeCommand(`tp ${id} -1392.6 1271.5 123.0`);
+      }
+    }
+
+    // Live Console SSE Stream
+    function initConsoleStream() {
+      const evtSource = new EventSource('/api/console/stream');
+      const output = document.getElementById('console-output');
+
+      evtSource.onmessage = (event) => {
+        try {
+          const item = JSON.parse(event.data);
+          appendLogLine(item.text, item.level);
+        } catch {
+          appendLogLine(event.data, 'info');
+        }
+      };
+
+      evtSource.onerror = () => {
+        // Automatically reconnects
+      };
+    }
+
+    function appendLogLine(text, level = 'info') {
+      const output = document.getElementById('console-output');
+      const line = document.createElement('div');
+      line.className = `log-line log-${level}`;
+      line.textContent = text;
+      output.appendChild(line);
+
+      if (autoScroll) {
+        output.scrollTop = output.scrollHeight;
+      }
+    }
+
+    function clearConsole() {
+      document.getElementById('console-output').innerHTML = '';
+    }
+
+    function toggleAutoScroll() {
+      autoScroll = !autoScroll;
+      document.getElementById('toggle-autoscroll').textContent = `AutoScroll: ${autoScroll ? 'ON' : 'OFF'}`;
+    }
+
+    // Command Prompt
+    const cmdInput = document.getElementById('console-cmd-input');
+    cmdInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        const cmd = cmdInput.value.trim();
+        if (!cmd) return;
+        commandHistory.push(cmd);
+        historyIndex = commandHistory.length;
+        cmdInput.value = '';
+        appendLogLine(`> ${cmd}`, 'system');
+        await executeCommand(cmd);
+      } else if (e.key === 'ArrowUp') {
+        if (historyIndex > 0) {
+          historyIndex--;
+          cmdInput.value = commandHistory[historyIndex];
+        }
+      } else if (e.key === 'ArrowDown') {
+        if (historyIndex < commandHistory.length - 1) {
+          historyIndex++;
+          cmdInput.value = commandHistory[historyIndex];
+        } else {
+          historyIndex = commandHistory.length;
+          cmdInput.value = '';
+        }
+      }
+    });
+
+    async function executeCommand(cmd) {
+      try {
+        const res = await fetch('/api/console/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: cmd })
+        });
+        const data = await res.json();
+        if (data.output) {
+          appendLogLine(data.output, data.success ? 'success' : 'warn');
+        }
+        refreshPlayers();
+      } catch (err) {
+        appendLogLine(`[Error executing command]: ${err.message}`, 'error');
+      }
+    }
+
+    function broadcastPrompt() {
+      const msg = prompt('Enter announcement message to all players:');
+      if (msg) executeCommand(`say ${msg}`);
+    }
+
+    // Resources Scan
+    async function refreshResources() {
+      try {
+        const res = await fetch('/api/resources');
+        const list = await res.json();
+        const tbody = document.getElementById('resources-tbody');
+        if (!list || list.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:24px;">No resources detected.</td></tr>`;
+          return;
+        }
+
+        let html = '';
+        for (const r of list) {
+          html += `
+            <tr>
+              <td><strong>${r.name}</strong></td>
+              <td><span class="badge ${r.isCore ? 'badge-yellow' : 'badge-cyan'}">${r.isCore ? 'CORE FRAMEWORK' : 'RESOURCE'}</span></td>
+              <td><span class="badge badge-green">RUNNING</span></td>
+              <td style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted);">${r.path}</td>
+              <td>
+                <button class="btn btn-warning" style="padding:4px 8px; font-size:0.75rem;" onclick="executeCommand('restart ${r.name}')">Restart</button>
+              </td>
+            </tr>
+          `;
+        }
+        tbody.innerHTML = html;
+      } catch (err) {
+        console.error('Error fetching resources:', err);
+      }
+    }
+
+    // Database View
+    async function refreshDatabaseView() {
+      try {
+        const res = await fetch('/api/database/players');
+        const list = await res.json();
+        const tbody = document.getElementById('db-players-tbody');
+        if (!list || list.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">No registered players in database.</td></tr>`;
+          return;
+        }
+
+        let html = '';
+        for (const row of list) {
+          const money = typeof row.money === 'string' ? JSON.parse(row.money || '{}') : (row.money || {});
+          const job = typeof row.job === 'string' ? JSON.parse(row.job || '{}') : (row.job || {});
+
+          html += `
+            <tr>
+              <td><span class="badge badge-cyan">${row.citizenid}</span></td>
+              <td><strong>${row.name || 'Unknown'}</strong></td>
+              <td>${row.owner_key || row.license || 'N/A'}</td>
+              <td>Slot ${row.slot || 1}</td>
+              <td><span style="color:var(--neon-green);">$${(money.cash || 0).toLocaleString()}</span> / <span style="color:var(--neon-cyan);">$${(money.bank || 0).toLocaleString()}</span></td>
+              <td>${job.label || job.name || 'Civilian'}</td>
+              <td style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted);">${row.last_updated || 'N/A'}</td>
+            </tr>
+          `;
+        }
+        tbody.innerHTML = html;
+      } catch (err) {
+        console.error('Error fetching database records:', err);
+      }
+    }
+
+    // Startup
+    window.addEventListener('DOMContentLoaded', () => {
+      initConsoleStream();
+      refreshPlayers();
+    });
+  </script>
+</body>
+</html>

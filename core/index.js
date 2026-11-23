@@ -5,6 +5,7 @@ const Player = require('./player');
 const db = require('./database');
 const commands = require('./commands');
 const callbacks = require('./callbacks');
+const adminServer = require('./admin_server');
 
 const SharedItems = require('../shared/items');
 const SharedJobs = require('../shared/jobs');
@@ -17,6 +18,8 @@ class G_CyberCoreEngine {
     this.activeVehicles = new Map(); // vehId -> { plate, ownerCitizenId, modelKey }
 
     this.Database = db;
+    this.DB = db; // Short alias
+    this.Config = require('../config');
     this.Player = Player;
     this.Players = this.onlinePlayers; // Map alias for compatibility
 
@@ -28,6 +31,7 @@ class G_CyberCoreEngine {
     };
 
     this.Commands = commands;
+    this.Admin = adminServer;
 
     this.Functions = {
       // Player management
@@ -70,6 +74,10 @@ class G_CyberCoreEngine {
 
     this.registerLifecycleEvents();
     this.registerCoreCommands();
+
+    if (this.Config && this.Config.AdminPanel && this.Config.AdminPanel.enabled) {
+      this.Admin.start(this);
+    }
   }
 
   CreatePlayer(mpPlayer, charData) {
