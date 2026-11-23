@@ -4,7 +4,10 @@
   "description": "The Definitive Modular Roleplay Framework for Cyberpunk 2077 (CyberMP)",
   "main": "server.js",
   "scripts": {
-    "test": "node --check server.js && node --check client.js && node --check config.js && node --check core/index.js && node --check core/player.js && node --check core/database.js && node --check core/admin_server.js"
+    "test": "node --check server.js && node --check client.js && node --check config.js && node --check core/index.js && node --check core/player.js && node --check core/database.js && node --check core/admin_server.js",
+    "orchestrator": "powershell -ExecutionPolicy Bypass -File tools/gcyber-deploy.ps1",
+    "sync-ecosystem": "powershell -ExecutionPolicy Bypass -File tools/gcyber-deploy.ps1 -Command sync",
+    "deploy-ecosystem": "powershell -ExecutionPolicy Bypass -File tools/gcyber-deploy.ps1 -Command deploy"
   },
   "repository": {
     "type": "git",
