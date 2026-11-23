@@ -2,6 +2,7 @@
 // The Definitive Roleplay Framework for Cyberpunk 2077 (CyberMP)
 
 const G_CyberCore = require('./core/index');
+global.G_CyberCore = G_CyberCore;
 
 console.log('[G-CyberRPcore] Server runtime initialized. Framework active.');
 
