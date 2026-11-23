@@ -19,6 +19,7 @@ let isNoclipActive = false;
 let isGodmodeActive = false;
 let isSeatbeltActive = false;
 let isAdminMenuActive = false;
+let isInventoryActive = false;
 let isSpawned = false;
 
 // Creator studio coordinates (Megabuilding H10 Mirror Studio)
@@ -151,6 +152,64 @@ function toggleAdminMenu(forceState) {
     mp.events.emitCef('g-cyber:ui:toggleAdmin', isAdminMenuActive);
   }
   console.log(`[G-CyberRPcore] Admin Menu toggled: ${isAdminMenuActive}`);
+}
+
+// Nearby vehicle detector for trunk/glovebox
+function getNearbyVehicleContainer() {
+  if (typeof mp === 'undefined' || !mp.players || !mp.players.local) return null;
+
+  const localPlayer = mp.players.local;
+  const pPos = localPlayer.position || [0, 0, 0];
+
+  // If inside vehicle, open glovebox
+  if (localPlayer.vehicle) {
+    const veh = localPlayer.vehicle;
+    const plate = (veh.getVariable && veh.getVariable('plate')) || 'NC-VEH';
+    return {
+      type: 'glovebox',
+      id: plate,
+      label: `GLOVEBOX [${plate}]`
+    };
+  }
+
+  // Look for nearest vehicle in world
+  if (mp.vehicles && typeof mp.vehicles.toArray === 'function') {
+    const vehicles = mp.vehicles.toArray();
+    for (const veh of vehicles) {
+      const vPos = veh.position || [0, 0, 0];
+      const dx = (pPos[0] || 0) - (vPos[0] || 0);
+      const dy = (pPos[1] || 0) - (vPos[1] || 0);
+      const dist = Math.hypot(dx, dy);
+
+      if (dist <= 4.0) {
+        const plate = (veh.getVariable && veh.getVariable('plate')) || 'NC-VEH';
+        return {
+          type: 'trunk',
+          id: plate,
+          label: `TRUNK [${plate}]`
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function toggleInventory(forceState) {
+  if (isAdminMenuActive) return;
+  isInventoryActive = (forceState !== undefined) ? Boolean(forceState) : !isInventoryActive;
+  safeSetFocus(isInventoryActive, isInventoryActive);
+  if (isInventoryActive) {
+    const containerReq = getNearbyVehicleContainer();
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('gcyber:inventory:serverOpen', JSON.stringify(containerReq));
+    }
+  } else {
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('gcyber:inventory:cefClose');
+    }
+  }
+  console.log(`[G-CyberRPcore] Inventory toggled: ${isInventoryActive}`);
 }
 
 function openChat() {
@@ -755,6 +814,8 @@ registerCommand('admin', () => toggleAdminMenu());
 registerCommand('adminmenu', () => toggleAdminMenu());
 registerCommand('a', () => toggleAdminMenu());
 registerCommand('hub', () => toggleAdminMenu());
+registerCommand('inv', () => toggleInventory());
+registerCommand('inventory', () => toggleInventory());
 registerCommand('noclip', () => setNoclip());
 registerCommand('god', () => setGodmode());
 registerCommand('heal', () => {
@@ -847,13 +908,26 @@ try {
               keyStates[key] = true;
               if (key === 121) { // IK_F10
                 toggleAdminMenu();
+              } else if (key === 9) { // IK_Tab -> Neural Inventory Matrix
+                toggleInventory();
+              } else if (key === 73) { // IK_I -> Neural Inventory Matrix
+                toggleInventory();
               } else if (key === 84) { // IK_T
                 openChat();
               } else if (key === 66) { // IK_B
                 handleSeatbelt();
               } else if (key === 27) { // IK_Escape
-                if (mp.events && typeof mp.events.emitCef === 'function') {
+                if (isInventoryActive) {
+                  toggleInventory(false);
+                } else if (mp.events && typeof mp.events.emitCef === 'function') {
                   mp.events.emitCef('g-cyber:ui:handleEscape');
+                }
+              } else if (key >= 49 && key <= 53) { // IK_1 to IK_5 -> Hotbar Quickslots
+                if (!isInventoryActive && !isAdminMenuActive) {
+                  const hotbarSlot = key - 49;
+                  if (mp.events && typeof mp.events.emitServer === 'function') {
+                    mp.events.emitServer('gcyber:inventory:serverUseItem', hotbarSlot);
+                  }
                 }
               }
             } else { // IACT_Release (2), IACT_None (0), or any other release/cancel
@@ -1142,6 +1216,29 @@ if (mp.events && typeof mp.events.onCef === 'function') {
   mp.events.onCef('chatClose', () => {
     safeSetFocus(false, false);
   });
+
+  // Inventory CEF Events
+  mp.events.onCef('gcyber:inventory:cefCloseWindow', () => {
+    toggleInventory(false);
+  });
+
+  mp.events.onCef('gcyber:inventory:cefMoveItem', (dataJson) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('gcyber:inventory:serverMoveItem', dataJson);
+    }
+  });
+
+  mp.events.onCef('gcyber:inventory:cefUseItem', (slotIdx) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('gcyber:inventory:serverUseItem', slotIdx);
+    }
+  });
+
+  mp.events.onCef('gcyber:inventory:cefDropItem', (dataJson) => {
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('gcyber:inventory:serverDropItem', dataJson);
+    }
+  });
 }
 
 // =====================================================================
@@ -1220,6 +1317,36 @@ if (mp.events && typeof mp.events.onServer === 'function') {
   mp.events.onServer('chat:add', (text, type = 'normal') => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('chat:addMessage', text, type);
+    }
+  });
+
+  // Inventory Server Events
+  mp.events.onServer('gcyber:inventory:clientOpen', (dataJson) => {
+    isInventoryActive = true;
+    safeSetFocus(true, true);
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('gcyber:inventory:cefOpen', dataJson);
+    }
+  });
+
+  mp.events.onServer('gcyber:inventory:clientUpdate', (dataJson) => {
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('gcyber:inventory:cefUpdate', dataJson);
+    }
+  });
+
+  mp.events.onServer('gcyber:inventory:clientEquipWeapon', (nativeId, itemId) => {
+    try {
+      const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+      if (player && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function') {
+        const transSys = mp.game.ScriptGameInstance.GetTransactionSystem();
+        if (transSys && nativeId) {
+          transSys.GiveItemByTDBID(player, nativeId, 1);
+          console.log(`[G-CyberRPcore] Weapon equipped: ${itemId} (${nativeId})`);
+        }
+      }
+    } catch (e) {
+      console.log('[G-CyberRPcore] clientEquipWeapon notice:', e);
     }
   });
 }

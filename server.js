@@ -4,6 +4,9 @@
 const G_CyberCore = require('./core/index');
 global.G_CyberCore = G_CyberCore;
 
+const G_CyberInventory = require('./core/inventory');
+G_CyberInventory.Mount();
+
 console.log('[G-CyberRPcore] Server runtime initialized. Framework active.');
 
 // In-Memory Admin Registry & Active Characters Cache

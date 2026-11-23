@@ -103,6 +103,12 @@ class Player {
       SyncInventory: () => this.SyncInventory(),
       Save: () => this.Save()
     };
+
+    // Expose citizenid & PlayerData directly on the CyberMP player instance
+    if (mpPlayer) {
+      mpPlayer.citizenid = this.PlayerData.citizenid;
+      mpPlayer.PlayerData = this.PlayerData;
+    }
   }
 
   // --- MONEY METHODS ---

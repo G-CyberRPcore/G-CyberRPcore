@@ -147,7 +147,7 @@ function Show-CyberBanner {
     Write-Color '║    \____/      \____/\__, /_.___/\___/_/     /_/ |_/_/    \___/\____/_/   \___/ ║' -color Cyan
     Write-Color '║                     /____/                                                    ║' -color Cyan
     Write-Color '║                                                                               ║' -color Cyan
-    Write-Color '║         CyberMP Dedicated Server Orchestrator & Auto-Deployer v1.0.0          ║' -color Green
+    Write-Color '║         CyberMP Dedicated Server Orchestrator and Auto-Deployer v1.0.0          ║' -color Green
     Write-Color '║                   Night City REDengine Roleplay Framework                     ║' -color DarkCyan
     Write-Color '╚═══════════════════════════════════════════════════════════════════════════════╝' -color Cyan
     Write-Host ""

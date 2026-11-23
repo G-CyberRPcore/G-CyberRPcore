@@ -1148,6 +1148,8 @@ document.addEventListener('DOMContentLoaded', () => {
         skipLoadingAndPlay();
       } else if (viewMultichar && viewMultichar.classList.contains('active')) {
         skipLoadingAndPlay();
+      } else if (isInventoryOpen) {
+        closeInventory();
       } else if (isAdminOpen) {
         toggleAdminMenu(false);
       } else if (isChatOpen) {
@@ -1205,6 +1207,471 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     mp.events.on('g-cyber:admin:updateCoords', (coordsStr) => {
       document.getElementById('admin-coords-display').textContent = coordsStr;
+    });
+
+    // =====================================================================
+    // 6. Neural Inventory Matrix Controller (Tab / I / /inv)
+    // =====================================================================
+    const viewInventory = document.getElementById('view-inventory');
+    const btnCloseInv = document.getElementById('btn-close-inv');
+    const invClockEl = document.getElementById('inv-clock');
+
+    // Player Elements
+    const invPlayerNameEl = document.getElementById('player-name');
+    const invPlayerIdEl = document.getElementById('player-id');
+    const invPlayerWeightTxt = document.getElementById('player-weight-txt');
+    const invPlayerWeightFill = document.getElementById('player-weight-fill');
+    const invPlayerHotbarGrid = document.getElementById('player-hotbar-grid');
+    const invPlayerSlotsGrid = document.getElementById('player-slots-grid');
+
+    // Container Elements
+    const invContainerNameEl = document.getElementById('container-name');
+    const invContainerIdEl = document.getElementById('container-id');
+    const invContainerWeightTxt = document.getElementById('container-weight-txt');
+    const invContainerWeightFill = document.getElementById('container-weight-fill');
+    const invContainerSlotsGrid = document.getElementById('container-slots-grid');
+    const invContainerStandby = document.getElementById('container-standby');
+
+    // Modal Elements
+    const invItemModal = document.getElementById('item-modal');
+    const invModalCloseBtn = document.getElementById('modal-close-btn');
+    const invModalTitle = document.getElementById('modal-title');
+    const invModalCategory = document.getElementById('modal-category');
+    const invModalDesc = document.getElementById('modal-desc');
+    const invModalWeight = document.getElementById('modal-weight');
+    const invModalCount = document.getElementById('modal-count');
+    const invModalIcon = document.getElementById('modal-icon');
+    const invSplitWrap = document.getElementById('split-wrap');
+    const invSplitSlider = document.getElementById('split-slider');
+    const invSplitValTxt = document.getElementById('split-val-txt');
+    const invBtnModalUse = document.getElementById('btn-modal-use');
+    const invBtnModalSplit = document.getElementById('btn-modal-split');
+    const invBtnModalDrop = document.getElementById('btn-modal-drop');
+
+    // Inventory State
+    let isInventoryOpen = false;
+    let invPlayerData = null;
+    let invContainerData = null;
+    let invItemDefinitions = {};
+    let invSelectedSlotData = null;
+    let invDraggedElementData = null;
+
+    // Real-time Clock for Inventory
+    setInterval(() => {
+      if (invClockEl) {
+        const now = new Date();
+        invClockEl.textContent = now.toTimeString().substring(0, 5);
+      }
+    }, 1000);
+
+    // Web Audio Synthesizer for Sleek Cyberpunk Sound FX
+    let invAudioCtx = null;
+    function playCyberSound(type) {
+      try {
+        if (!invAudioCtx) {
+          invAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (invAudioCtx.state === 'suspended') {
+          invAudioCtx.resume();
+        }
+        const osc = invAudioCtx.createOscillator();
+        const gain = invAudioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(invAudioCtx.destination);
+
+        const now = invAudioCtx.currentTime;
+        if (type === 'click') {
+          osc.frequency.setValueAtTime(800, now);
+          osc.frequency.exponentialRampToValueAtTime(400, now + 0.05);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+          osc.start(now);
+          osc.stop(now + 0.05);
+        } else if (type === 'drop') {
+          osc.frequency.setValueAtTime(400, now);
+          osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'use') {
+          osc.frequency.setValueAtTime(600, now);
+          osc.frequency.linearRampToValueAtTime(1200, now + 0.12);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        }
+      } catch (e) {
+        // Audio fallback
+      }
+    }
+
+    // Close Inventory Handler
+    function closeInventory() {
+      playCyberSound('click');
+      isInventoryOpen = false;
+      if (viewInventory) viewInventory.classList.add('hidden');
+      if (invItemModal) invItemModal.classList.add('hidden');
+      if (window.mp && mp.events) {
+        mp.events.emit('gcyber:inventory:cefCloseWindow');
+      }
+    }
+
+    if (btnCloseInv) btnCloseInv.addEventListener('click', closeInventory);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || e.key === 'Tab') {
+        if (isInventoryOpen) {
+          e.preventDefault();
+          closeInventory();
+        }
+      }
+    });
+
+    // Render Slots Helper
+    function createInvSlotElement(slotIdx, item, type, isHotbar) {
+      const slotEl = document.createElement('div');
+      slotEl.className = 'inv-slot' + (isHotbar ? ' hotbar-slot' : '');
+      slotEl.dataset.slot = slotIdx;
+      slotEl.dataset.type = type;
+
+      // Slot Number Display
+      const numEl = document.createElement('span');
+      numEl.className = 'slot-num';
+      numEl.textContent = isHotbar ? `[${slotIdx + 1}]` : `#${slotIdx + 1}`;
+      slotEl.appendChild(numEl);
+
+      if (item && item.id) {
+        const def = invItemDefinitions[item.id] || {
+          label: item.id,
+          category: 'misc',
+          weight: 0.5,
+          icon: '📦'
+        };
+
+        slotEl.dataset.itemId = item.id;
+        slotEl.draggable = true;
+
+        // Content (Icon & Label)
+        const contentEl = document.createElement('div');
+        contentEl.className = 'slot-content';
+
+        const iconEl = document.createElement('span');
+        iconEl.className = 'slot-icon';
+        iconEl.textContent = def.icon || '📦';
+        contentEl.appendChild(iconEl);
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'slot-name';
+        nameEl.textContent = def.label || item.id;
+        contentEl.appendChild(nameEl);
+
+        slotEl.appendChild(contentEl);
+
+        // Bottom info (Weight & Amount)
+        const bottomEl = document.createElement('div');
+        bottomEl.className = 'slot-bottom';
+
+        const weightEl = document.createElement('span');
+        const totalWeight = ((def.weight || 0.5) * (item.amount || 1)).toFixed(1);
+        weightEl.textContent = `${totalWeight}kg`;
+        bottomEl.appendChild(weightEl);
+
+        if (item.amount && item.amount > 1) {
+          const amountEl = document.createElement('span');
+          amountEl.className = 'slot-amount';
+          amountEl.textContent = `x${item.amount}`;
+          bottomEl.appendChild(amountEl);
+        }
+
+        slotEl.appendChild(bottomEl);
+
+        // Click to open item action modal
+        slotEl.addEventListener('click', () => {
+          openInvItemModal(item, def, slotIdx, type);
+        });
+
+        // Drag & Drop Handlers
+        slotEl.addEventListener('dragstart', (e) => {
+          invDraggedElementData = {
+            fromType: type,
+            fromSlot: slotIdx,
+            item: item
+          };
+          e.dataTransfer.setData('text/plain', JSON.stringify(invDraggedElementData));
+          slotEl.style.opacity = '0.5';
+          playCyberSound('click');
+        });
+
+        slotEl.addEventListener('dragend', () => {
+          slotEl.style.opacity = '1';
+        });
+      }
+
+      // Drop Target Handlers
+      slotEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        slotEl.classList.add('drag-over');
+      });
+
+      slotEl.addEventListener('dragleave', () => {
+        slotEl.classList.remove('drag-over');
+      });
+
+      slotEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        slotEl.classList.remove('drag-over');
+        playCyberSound('drop');
+
+        let dragData = null;
+        try {
+          dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+        } catch (err) {
+          dragData = invDraggedElementData;
+        }
+
+        if (dragData) {
+          const movePayload = {
+            fromType: dragData.fromType,
+            fromSlot: dragData.fromSlot,
+            toType: type,
+            toSlot: slotIdx,
+            containerId: invContainerData ? invContainerData.id : null,
+            amount: null // Full stack move
+          };
+
+          if (window.mp && mp.events) {
+            mp.events.emit('gcyber:inventory:cefMoveItem', JSON.stringify(movePayload));
+          }
+        }
+      });
+
+      return slotEl;
+    }
+
+    // Render Full Inventory UI
+    function renderInventoryUI() {
+      if (!invPlayerData) return;
+
+      // 1. Render Player Header
+      if (invPlayerNameEl) invPlayerNameEl.textContent = invPlayerData.name || 'CITIZEN POCKETS';
+      if (invPlayerIdEl) invPlayerIdEl.textContent = `ID: ${invPlayerData.citizenid || 'NC-0000'}`;
+
+      const pWeight = invPlayerData.weight || 0;
+      const pMaxWeight = invPlayerData.maxWeight || 120.0;
+      if (invPlayerWeightTxt) invPlayerWeightTxt.textContent = `${pWeight.toFixed(1)} / ${pMaxWeight.toFixed(1)} KG`;
+      const pPct = Math.min(100, Math.round((pWeight / pMaxWeight) * 100));
+      if (invPlayerWeightFill) invPlayerWeightFill.style.width = `${pPct}%`;
+
+      // 2. Render Player Hotbar (Slots 0 to 4)
+      if (invPlayerHotbarGrid) {
+        invPlayerHotbarGrid.innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+          const item = invPlayerData.items[i];
+          const slotEl = createInvSlotElement(i, item, 'player', true);
+          invPlayerHotbarGrid.appendChild(slotEl);
+        }
+      }
+
+      // 3. Render Player Main Slots (Slots 5 to maxSlots - 1)
+      if (invPlayerSlotsGrid) {
+        invPlayerSlotsGrid.innerHTML = '';
+        const maxSlots = invPlayerData.maxSlots || 35;
+        for (let i = 5; i < maxSlots; i++) {
+          const item = invPlayerData.items[i];
+          const slotEl = createInvSlotElement(i, item, 'player', false);
+          invPlayerSlotsGrid.appendChild(slotEl);
+        }
+      }
+
+      // 4. Render Container (if available)
+      if (invContainerData && invContainerData.items) {
+        if (invContainerStandby) invContainerStandby.classList.add('hidden');
+        if (invContainerNameEl) invContainerNameEl.textContent = invContainerData.label || 'LOCAL STORAGE';
+        if (invContainerIdEl) invContainerIdEl.textContent = invContainerData.id || 'ACTIVE';
+
+        const cWeight = invContainerData.weight || 0;
+        const cMaxWeight = invContainerData.maxWeight || 150.0;
+        if (invContainerWeightTxt) invContainerWeightTxt.textContent = `${cWeight.toFixed(1)} / ${cMaxWeight.toFixed(1)} KG`;
+        const cPct = Math.min(100, Math.round((cWeight / cMaxWeight) * 100));
+        if (invContainerWeightFill) invContainerWeightFill.style.width = `${cPct}%`;
+
+        if (invContainerSlotsGrid) {
+          invContainerSlotsGrid.innerHTML = '';
+          const cMaxSlots = invContainerData.maxSlots || 30;
+          for (let i = 0; i < cMaxSlots; i++) {
+            const item = invContainerData.items[i];
+            const slotEl = createInvSlotElement(i, item, 'container', false);
+            invContainerSlotsGrid.appendChild(slotEl);
+          }
+        }
+      } else {
+        if (invContainerStandby) invContainerStandby.classList.remove('hidden');
+        if (invContainerSlotsGrid) invContainerSlotsGrid.innerHTML = '';
+        if (invContainerNameEl) invContainerNameEl.textContent = 'LOCAL STORAGE';
+        if (invContainerIdEl) invContainerIdEl.textContent = 'STANDBY';
+        if (invContainerWeightTxt) invContainerWeightTxt.textContent = '0.0 / 0.0 KG';
+        if (invContainerWeightFill) invContainerWeightFill.style.width = '0%';
+      }
+    }
+
+    // Open Item Detail & Action Modal
+    function openInvItemModal(item, def, slotIdx, type) {
+      invSelectedSlotData = { item, def, slotIdx, type };
+      playCyberSound('click');
+
+      if (invModalTitle) invModalTitle.textContent = def.label || item.id;
+      if (invModalCategory) invModalCategory.textContent = def.category || 'EQUIPMENT';
+      if (invModalDesc) invModalDesc.textContent = def.description || 'Standard manufactured item in Night City.';
+      if (invModalWeight) invModalWeight.textContent = `${def.weight || 0.5} KG`;
+      if (invModalCount) invModalCount.textContent = `x${item.amount || 1}`;
+      if (invModalIcon) invModalIcon.textContent = def.icon || '📦';
+
+      // Usable button
+      if (invBtnModalUse) {
+        if (def.usable && type === 'player') {
+          invBtnModalUse.classList.remove('hidden');
+        } else {
+          invBtnModalUse.classList.add('hidden');
+        }
+      }
+
+      // Split Stack Slider
+      if (item.amount && item.amount > 1 && def.stackable) {
+        if (invSplitWrap) invSplitWrap.classList.remove('hidden');
+        if (invSplitSlider) {
+          invSplitSlider.min = 1;
+          invSplitSlider.max = item.amount - 1;
+          invSplitSlider.value = Math.floor(item.amount / 2);
+        }
+        if (invSplitValTxt && invSplitSlider) invSplitValTxt.textContent = invSplitSlider.value;
+        if (invBtnModalSplit) invBtnModalSplit.classList.remove('hidden');
+      } else {
+        if (invSplitWrap) invSplitWrap.classList.add('hidden');
+        if (invBtnModalSplit) invBtnModalSplit.classList.add('hidden');
+      }
+
+      if (invItemModal) invItemModal.classList.remove('hidden');
+    }
+
+    if (invModalCloseBtn) {
+      invModalCloseBtn.addEventListener('click', () => {
+        if (invItemModal) invItemModal.classList.add('hidden');
+        invSelectedSlotData = null;
+      });
+    }
+
+    if (invSplitSlider && invSplitValTxt) {
+      invSplitSlider.addEventListener('input', () => {
+        invSplitValTxt.textContent = invSplitSlider.value;
+      });
+    }
+
+    // Action Button: USE
+    if (invBtnModalUse) {
+      invBtnModalUse.addEventListener('click', () => {
+        if (!invSelectedSlotData) return;
+        playCyberSound('use');
+        if (window.mp && mp.events) {
+          mp.events.emit('gcyber:inventory:cefUseItem', invSelectedSlotData.slotIdx);
+        }
+        if (invItemModal) invItemModal.classList.add('hidden');
+        invSelectedSlotData = null;
+      });
+    }
+
+    // Action Button: DROP
+    if (invBtnModalDrop) {
+      invBtnModalDrop.addEventListener('click', () => {
+        if (!invSelectedSlotData) return;
+        playCyberSound('drop');
+        const amount = (invSplitWrap && invSplitWrap.classList.contains('hidden'))
+          ? invSelectedSlotData.item.amount
+          : parseInt(invSplitSlider.value, 10);
+        if (window.mp && mp.events) {
+          mp.events.emit('gcyber:inventory:cefDropItem', JSON.stringify({
+            slot: invSelectedSlotData.slotIdx,
+            amount: amount
+          }));
+        }
+        if (invItemModal) invItemModal.classList.add('hidden');
+        invSelectedSlotData = null;
+      });
+    }
+
+    // Action Button: SPLIT
+    if (invBtnModalSplit) {
+      invBtnModalSplit.addEventListener('click', () => {
+        if (!invSelectedSlotData || !invPlayerData) return;
+        playCyberSound('click');
+        const splitCount = parseInt(invSplitSlider.value, 10);
+
+        // Find first empty slot in player pockets
+        let emptySlot = -1;
+        for (let i = 0; i < invPlayerData.items.length; i++) {
+          if (!invPlayerData.items[i]) {
+            emptySlot = i;
+            break;
+          }
+        }
+
+        if (emptySlot !== -1 && window.mp && mp.events) {
+          mp.events.emit('gcyber:inventory:cefMoveItem', JSON.stringify({
+            fromType: invSelectedSlotData.type,
+            fromSlot: invSelectedSlotData.slotIdx,
+            toType: invSelectedSlotData.type,
+            toSlot: emptySlot,
+            containerId: invContainerData ? invContainerData.id : null,
+            amount: splitCount
+          }));
+        }
+
+        if (invItemModal) invItemModal.classList.add('hidden');
+        invSelectedSlotData = null;
+      });
+    }
+
+    // CEF Event Listeners for Inventory
+    mp.events.on('gcyber:inventory:cefOpen', (jsonStr) => {
+      try {
+        const payload = (typeof jsonStr === 'string') ? JSON.parse(jsonStr) : jsonStr;
+        invPlayerData = payload.player;
+        invContainerData = payload.container;
+        if (payload.itemDefinitions) {
+          invItemDefinitions = payload.itemDefinitions;
+        }
+
+        renderInventoryUI();
+        isInventoryOpen = true;
+        if (viewInventory) viewInventory.classList.remove('hidden');
+        playCyberSound('use');
+      } catch (e) {
+        console.error('[G-CyberRPcore] cefOpen parse error:', e);
+      }
+    });
+
+    mp.events.on('gcyber:inventory:cefUpdate', (jsonStr) => {
+      try {
+        const payload = (typeof jsonStr === 'string') ? JSON.parse(jsonStr) : jsonStr;
+        if (payload.player && invPlayerData) {
+          invPlayerData.weight = payload.player.weight;
+          invPlayerData.items = payload.player.items;
+        }
+        if (payload.container && invContainerData) {
+          invContainerData.weight = payload.container.weight;
+          invContainerData.items = payload.container.items;
+        }
+        renderInventoryUI();
+      } catch (e) {
+        console.error('[G-CyberRPcore] cefUpdate error:', e);
+      }
+    });
+
+    mp.events.on('gcyber:inventory:cefClose', () => {
+      isInventoryOpen = false;
+      if (viewInventory) viewInventory.classList.add('hidden');
+      if (invItemModal) invItemModal.classList.add('hidden');
     });
 
     mp.events.on('chat:open', () => openChat());
