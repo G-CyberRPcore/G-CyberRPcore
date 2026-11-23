@@ -155,7 +155,8 @@ class DatabaseEngine {
         database: cfg.database || 'gcyberrp',
         connectionLimit: cfg.connectionLimit || 10,
         waitForConnections: true,
-        queueLimit: 0
+        queueLimit: 0,
+        disableEval: true
       });
 
       // Test connectivity
@@ -339,7 +340,7 @@ class DatabaseEngine {
     if (!this.connected) return null;
     try {
       if (this.driver === 'mysql' && this.mysqlPool) {
-        const [result] = await this.mysqlPool.execute(query, params);
+        const [result] = await this.mysqlPool.query({ sql: query, values: params, disableEval: true });
         return result;
       } else if (this.driver === 'sqlite' && this.sqliteDb) {
         const stmt = this.sqliteDb.prepare(query);
@@ -355,7 +356,7 @@ class DatabaseEngine {
     if (!this.connected) return [];
     try {
       if (this.driver === 'mysql' && this.mysqlPool) {
-        const [rows] = await this.mysqlPool.query(query, params);
+        const [rows] = await this.mysqlPool.query({ sql: query, values: params, disableEval: true });
         return rows || [];
       } else if (this.driver === 'sqlite' && this.sqliteDb) {
         const stmt = this.sqliteDb.prepare(query);

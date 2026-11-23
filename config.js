@@ -33,7 +33,8 @@ Config.Database = {
     connectionLimit: 10,
     waitForConnections: true,
     queueLimit: 0,
-    connectTimeout: 10000
+    connectTimeout: 10000,
+    disableEval: true // Required for embedded V8 / libnode environments
   },
 
   // SQLite parameters (Fallback / Zero-config mode)
