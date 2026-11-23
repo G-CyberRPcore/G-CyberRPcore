@@ -9,8 +9,9 @@ console.log('[G-CyberRPcore] Server runtime initialized. Framework active.');
 // In-Memory Admin Registry & Active Characters Cache
 const ADMIN_PLAYERS = new Set([0, 1]); // Player ID 0 (Host) & 1 are default admins
 
-// Default Spawn: Megabuilding H10 Apartment (Watson, Little China)
-const DEFAULT_SPAWN = [-1392.6, 1271.5, 123.0];
+// Default Spawn: Megabuilding H10 Atrium Hallway (Watson, Little China - open walkway, elevators, shops)
+const DEFAULT_SPAWN = [-1382.0, 1272.0, 123.0];
+const STREET_SPAWN = [-1375.0, 1245.0, 24.5];
 
 // Helper: Get Player Identification Key (License / IP / Nickname)
 function getPlayerKey(player) {
@@ -102,8 +103,11 @@ mp.events.onClient('g-cyber:server:createCharacter', (player, characterJson) => 
     // Register active player in G_CyberCore
     const corePlayer = G_CyberCore.CreatePlayer(player, newChar);
 
-    // Teleport to Apartment Spawn
-    player.position = DEFAULT_SPAWN;
+    // Teleport to Hallway / Atrium Spawn
+    const spawnPos = (newChar.position && Array.isArray(newChar.position) && newChar.position.length >= 3)
+      ? newChar.position
+      : DEFAULT_SPAWN;
+    player.position = spawnPos;
 
     // Notify client that character was loaded
     player.emit('g-cyber:client:characterLoaded', JSON.stringify(newChar));
@@ -139,8 +143,11 @@ mp.events.onClient('g-cyber:server:selectCharacter', (player, citizenid) => {
     // Register in memory
     const corePlayer = G_CyberCore.CreatePlayer(player, charData);
 
-    // Teleport player
-    player.position = DEFAULT_SPAWN;
+    // Teleport player to saved position or open atrium spawn
+    const spawnPos = (charData.position && Array.isArray(charData.position) && charData.position.length >= 3)
+      ? charData.position
+      : DEFAULT_SPAWN;
+    player.position = spawnPos;
 
     // Notify client
     player.emit('g-cyber:client:characterLoaded', JSON.stringify(charData));
@@ -507,6 +514,160 @@ mp.events.onClient('g-cyber:admin:toggleAdminMenu', (player) => {
     if (typeof player.emit === 'function') player.emit('g-cyber:client:toggleAdmin');
     if (mp.events && typeof mp.events.emitClient === 'function') {
       mp.events.emitClient(player.id, 'g-cyber:client:toggleAdmin');
+    }
+  }
+});
+
+// =====================================================================
+// PROXIMITY ROLEPLAY CHAT & EMERGENCY DISPATCH HANDLERS
+// =====================================================================
+
+function sendProximityMessage(player, text, maxDistance = 15, msgType = 'normal') {
+  if (!player || !player.position) return;
+  const pPos = player.position;
+  const pDim = player.dimension || 0;
+
+  mp.players.toArray().forEach((target) => {
+    if ((target.dimension || 0) !== pDim) return;
+    const tPos = target.position;
+    if (!tPos) return;
+    const distance = Math.hypot(pPos[0] - tPos[0], pPos[1] - tPos[1], pPos[2] - tPos[2]);
+    if (distance <= maxDistance) {
+      target.emit('chat:add', text, msgType);
+    }
+  });
+}
+
+// Proximity local chat (regular speech)
+mp.events.onClient('chat:message', (player, text) => {
+  if (!text || text.trim().length === 0) return;
+  const cleanText = text.trim();
+  const format = `[Local] ${player.nickname}: ${cleanText}`;
+  sendProximityMessage(player, format, 15, 'normal');
+});
+
+// Chat commands dispatcher
+mp.events.onClient('chat:command', (player, cmdName, args = []) => {
+  const cmd = (cmdName || '').toLowerCase();
+
+  switch (cmd) {
+    case 'exit':
+    case 'outside':
+    case 'leave': {
+      player.position = DEFAULT_SPAWN;
+      player.emit('g-cyber:client:notify', 'Wayfinding', 'Exited room to Megabuilding H10 Atrium walkway.', 'success');
+      player.emit('chat:add', '[System] Teleported outside to open Megabuilding H10 Atrium.', 'system');
+      break;
+    }
+
+    case 'street': {
+      player.position = STREET_SPAWN;
+      player.emit('g-cyber:client:notify', 'Wayfinding', 'Teleported to Little China street level.', 'success');
+      player.emit('chat:add', '[System] Teleported to Little China street plaza.', 'system');
+      break;
+    }
+
+    case 'apartment': {
+      const pPos = player.position || [0, 0, 0];
+      const distToInside = Math.hypot(pPos[0] - (-1392.6), pPos[1] - 1271.5);
+      if (distToInside < 8.0) {
+        player.position = DEFAULT_SPAWN;
+        player.emit('chat:add', '[Apartment] Exited to Megabuilding H10 hallway.', 'system');
+      } else {
+        player.position = [-1392.6, 1271.5, 123.0];
+        player.emit('chat:add', '[Apartment] Entered V\'s Megabuilding H10 apartment.', 'system');
+      }
+      break;
+    }
+
+    case 'me': {
+      if (!args || args.length === 0) {
+        player.emit('chat:add', 'Usage: /me <action>', 'system');
+        return;
+      }
+      sendProximityMessage(player, `* ${player.nickname} ${args.join(' ')}`, 15, 'me');
+      break;
+    }
+
+    case 'do': {
+      if (!args || args.length === 0) {
+        player.emit('chat:add', 'Usage: /do <description>', 'system');
+        return;
+      }
+      sendProximityMessage(player, `* ${args.join(' ')} (( ${player.nickname} ))`, 15, 'do');
+      break;
+    }
+
+    case 'b':
+    case 'ooc': {
+      if (!args || args.length === 0) {
+        player.emit('chat:add', 'Usage: /ooc <message>', 'system');
+        return;
+      }
+      sendProximityMessage(player, `(( [OOC] ${player.nickname}: ${args.join(' ')} ))`, 15, 'ooc');
+      break;
+    }
+
+    case 's':
+    case 'shout': {
+      if (!args || args.length === 0) {
+        player.emit('chat:add', 'Usage: /shout <message>', 'system');
+        return;
+      }
+      sendProximityMessage(player, `[Shout] ${player.nickname}: ${args.join(' ')}!`, 35, 'shout');
+      break;
+    }
+
+    case 'w':
+    case 'whisper': {
+      if (!args || args.length === 0) {
+        player.emit('chat:add', 'Usage: /whisper <message>', 'system');
+        return;
+      }
+      sendProximityMessage(player, `[Whisper] ${player.nickname}: ${args.join(' ')}`, 3.5, 'whisper');
+      break;
+    }
+
+    case 'tweet': {
+      if (!args || args.length === 0) {
+        player.emit('chat:add', 'Usage: /tweet <message>', 'system');
+        return;
+      }
+      const tweetText = `[NightNet] @${player.nickname}: ${args.join(' ')}`;
+      mp.players.toArray().forEach((p) => {
+        p.emit('chat:add', tweetText, 'tweet');
+      });
+      break;
+    }
+
+    case 'dispatch':
+    case '911': {
+      if (!args || args.length === 0) {
+        player.emit('chat:add', 'Usage: /dispatch <emergency report>', 'system');
+        return;
+      }
+      const pPos = player.position || [0, 0, 0];
+      const alert = `[EMERGENCY 911] Call from ${player.nickname} (Pos: [${Math.round(pPos[0])}, ${Math.round(pPos[1])}]): ${args.join(' ')}`;
+      mp.players.toArray().forEach((p) => {
+        p.emit('chat:add', alert, 'dispatch');
+      });
+      player.emit('chat:add', '[911] Your emergency transmission was routed to Night City First Responders.', 'system');
+      break;
+    }
+
+    case 'help': {
+      player.emit('chat:add', '=== Night City RP Commands ===', 'system');
+      player.emit('chat:add', '/me <action> • /do <state> • /ooc <msg> • /shout <msg>', 'system');
+      player.emit('chat:add', '/exit or /outside - Teleport to open atrium if trapped in a room', 'system');
+      player.emit('chat:add', '/street - Teleport to street level', 'system');
+      player.emit('chat:add', '/apartment - Toggle apartment entrance/exit', 'system');
+      player.emit('chat:add', '/tweet <msg> • /dispatch <msg> • /admin (or F10)', 'system');
+      break;
+    }
+
+    default: {
+      player.emit('chat:add', `Unknown command: /${cmd}. Type /help for available commands.`, 'system');
+      break;
     }
   }
 });

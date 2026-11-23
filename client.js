@@ -129,7 +129,7 @@ function setMaxHealth(value) {
   }
 }
 
-function spawnPlayer(x = -1392.637, y = 1271.536, z = 123.082, yaw = 1.0) {
+function spawnPlayer(x = -1382.0, y = 1272.0, z = 123.0, yaw = 90.0) {
   console.log(`[G-CyberRPcore] Spawning player at (${x}, ${y}, ${z}, yaw: ${yaw})...`);
   setMaxHealth(SPAWN_HEALTH);
   setHealth(SPAWN_HEALTH);
@@ -798,7 +798,19 @@ registerCommand('loading', () => {
   }
 });
 registerCommand('spawn', () => {
-  spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+  spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+  safeSetFocus(false, false);
+});
+registerCommand('exit', () => {
+  spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+  safeSetFocus(false, false);
+});
+registerCommand('outside', () => {
+  spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+  safeSetFocus(false, false);
+});
+registerCommand('street', () => {
+  spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
   safeSetFocus(false, false);
 });
 registerCommand('ui', () => {
@@ -862,7 +874,7 @@ try {
 function handleWorldReady() {
   console.log('[G-CyberRPcore] World loaded! Game environment ready.');
   if (isSpawned) {
-    spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+    spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
   }
 }
 
@@ -901,7 +913,7 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     console.log('[G-CyberRPcore] Loading screen closed. Releasing input focus to game.');
     safeSetFocus(false, false);
     if (!isSpawned) {
-      spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+      spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
     }
   });
 
@@ -1151,7 +1163,7 @@ if (mp.events && typeof mp.events.onServer === 'function') {
   mp.events.onServer('g-cyber:client:showCreator', () => handleSkin());
   mp.events.onServer('g-cyber:client:showMultichar', () => handleChar());
   mp.events.onServer('g-cyber:client:respawn', () => {
-    spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+    spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
     safeSetFocus(false, false);
   });
 
@@ -1164,7 +1176,15 @@ if (mp.events && typeof mp.events.onServer === 'function') {
 
   mp.events.onServer('g-cyber:client:characterLoaded', (charJson) => {
     console.log('[G-CyberRPcore] Character successfully loaded from server. Spawning...');
-    spawnPlayer(-1392.637, 1271.536, 123.082, 1.0);
+    try {
+      const char = (typeof charJson === 'string') ? JSON.parse(charJson) : charJson;
+      const spawnPos = (char && char.position && Array.isArray(char.position) && char.position.length >= 3)
+        ? char.position
+        : [-1382.0, 1272.0, 123.0];
+      spawnPlayer(spawnPos[0], spawnPos[1], spawnPos[2], 90.0);
+    } catch (e) {
+      spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+    }
     safeSetFocus(false, false);
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('g-cyber:ui:characterSpawned', charJson);

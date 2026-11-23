@@ -848,6 +848,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatInput.blur();
     if (window.mp && mp.events) {
       mp.events.emit('chat:focus', false);
+      mp.events.emit('chatClose');
     }
   }
 
@@ -856,6 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const text = chatInput.value.trim();
       if (text.length > 0 && window.mp && mp.events) {
         mp.events.emit('chat:submit', text);
+        mp.events.emit('chatSubmit', text);
       }
       closeChat();
     } else if (e.key === 'Escape') {
