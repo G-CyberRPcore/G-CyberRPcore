@@ -717,12 +717,19 @@ const CuratedItems = {
   }
 };
 
-// Merge full punkmp.wiki catalog dynamically (preserving curated keys)
+// Merge full punkmp.wiki catalog dynamically from gcyber-inventory (preserving curated keys)
 let PunkmpCatalog = {};
 try {
-  const catalogPath = path.join(__dirname, 'punkmp_catalog.json');
-  if (fs.existsSync(catalogPath)) {
-    PunkmpCatalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+  const candidatePaths = [
+    path.resolve(__dirname, '../../gcyber-inventory/shared/punkmp_catalog.json'),
+    path.join(process.cwd(), 'resources', 'gcyber-inventory', 'shared', 'punkmp_catalog.json'),
+    path.join(__dirname, 'punkmp_catalog.json')
+  ];
+  for (const catalogPath of candidatePaths) {
+    if (fs.existsSync(catalogPath)) {
+      PunkmpCatalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+      break;
+    }
   }
 } catch (err) {
   console.warn('[G-CyberRPcore] Could not load punkmp_catalog.json:', err.message);

@@ -136,6 +136,40 @@ class AdminServer {
       return;
     }
 
+    // 1B. Inventory Item Icons from gcyber-inventory (avoids bloating resource.archive)
+    if (pathname.startsWith('/inv-items/') && req.method === 'GET') {
+      try {
+        const rawName = decodeURIComponent(pathname.slice('/inv-items/'.length));
+        const safeName = path.basename(rawName);
+        if (!safeName || safeName === '.' || safeName === '..') {
+          res.writeHead(400);
+          res.end('Invalid filename');
+          return;
+        }
+        const iconDirs = [
+          path.resolve(__dirname, '../../gcyber-inventory/ui/assets/items'),
+          path.join(process.cwd(), 'resources', 'gcyber-inventory', 'ui', 'assets', 'items'),
+          path.resolve(__dirname, '../ui/assets/items')
+        ];
+        for (const dir of iconDirs) {
+          const fullPath = path.join(dir, safeName);
+          if (fs.existsSync(fullPath)) {
+            const ext = path.extname(safeName).toLowerCase();
+            const mime = ext === '.svg' ? 'image/svg+xml' : (ext === '.png' ? 'image/png' : 'image/webp');
+            res.writeHead(200, {
+              'Content-Type': mime,
+              'Cache-Control': 'public, max-age=604800'
+            });
+            res.end(fs.readFileSync(fullPath));
+            return;
+          }
+        }
+      } catch (e) {}
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+
     // 2. Server-Sent Events (SSE) Console Stream
     if (pathname === '/api/console/stream') {
       res.writeHead(200, {

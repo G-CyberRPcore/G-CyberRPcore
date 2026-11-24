@@ -1371,6 +1371,9 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     console.log('[G-CyberRPcore] CEF DOM ready:', name);
     safeSetFocus(true, true);
     mp.events.emitCef('g-cyber:ui:showLoading');
+    if (mp.events && typeof mp.events.emitServer === 'function') {
+      mp.events.emitServer('gcyber:inventory:serverResetIcons');
+    }
   });
 
   mp.events.onCef('g-cyber:ui:setFocus', (state) => {
@@ -1787,6 +1790,12 @@ if (mp.events && typeof mp.events.onServer === 'function') {
   mp.events.onServer('gcyber:inventory:clientUpdate', (dataJson) => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('gcyber:inventory:cefUpdate', dataJson);
+    }
+  });
+
+  mp.events.onServer('gcyber:inventory:clientIcon', (fileName, dataUri) => {
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('gcyber:inventory:cefIcon', fileName, dataUri);
     }
   });
 

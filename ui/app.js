@@ -1175,16 +1175,39 @@ document.addEventListener('DOMContentLoaded', () => {
     return val.toFixed(1);
   }
 
+  const invIconDataCache = Object.create(null);
+
+  function resolveItemIconFile(def) {
+    if (!def || !def.image) return '';
+    return String(def.image).split('/').pop().split('?')[0];
+  }
+
+  function resolveItemIconSrc(def) {
+    const fileName = resolveItemIconFile(def);
+    if (!fileName) return '';
+    if (invIconDataCache[fileName]) return invIconDataCache[fileName];
+    return `http://127.0.0.1:2078/inv-items/${encodeURIComponent(fileName)}`;
+  }
+
   function createItemArtElement(def) {
-    if (def && def.image) {
+    const fileName = resolveItemIconFile(def);
+    const src = resolveItemIconSrc(def);
+    if (src) {
       const img = document.createElement('img');
       img.className = 'slot-img';
-      img.src = def.image;
-      img.alt = def.label || 'Item';
+      img.dataset.iconFile = fileName;
+      img.src = src;
+      img.alt = (def && def.label) || 'Item';
       img.draggable = false;
       img.onerror = () => {
+        const cached = invIconDataCache[fileName];
+        if (cached && img.src !== cached) {
+          img.src = cached;
+          return;
+        }
         const fallback = document.createElement('span');
         fallback.className = 'slot-icon';
+        if (fileName) fallback.dataset.iconPending = fileName;
         fallback.textContent = (def && def.icon) ? def.icon : '📦';
         if (img.parentNode) img.parentNode.replaceChild(fallback, img);
       };
@@ -1952,6 +1975,28 @@ document.addEventListener('DOMContentLoaded', () => {
         invBtnHolster.classList.toggle('hidden', !invEquippedItemId);
       }
       if (isInventoryOpen) renderInventoryUI();
+    });
+
+    mp.events.on('gcyber:inventory:cefIcon', (fileName, dataUri) => {
+      if (!fileName || !dataUri) return;
+      invIconDataCache[fileName] = dataUri;
+
+      document.querySelectorAll('img[data-icon-file]').forEach((img) => {
+        if (img.dataset.iconFile === fileName && img.src !== dataUri) {
+          img.src = dataUri;
+        }
+      });
+
+      document.querySelectorAll('span[data-icon-pending]').forEach((span) => {
+        if (span.dataset.iconPending !== fileName) return;
+        const img = document.createElement('img');
+        img.className = 'slot-img';
+        img.dataset.iconFile = fileName;
+        img.src = dataUri;
+        img.alt = fileName;
+        img.draggable = false;
+        if (span.parentNode) span.parentNode.replaceChild(img, span);
+      });
     });
 
     mp.events.on('gcyber:inventory:cefClose', () => {

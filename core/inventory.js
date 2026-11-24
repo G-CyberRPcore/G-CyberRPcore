@@ -121,6 +121,80 @@ function findNearbyGroundDrop(pos, radius = 3.5) {
   return null;
 }
 
+const IconDataCache = new Map();
+
+function resolveIconsDir() {
+  const candidates = [
+    path.resolve(__dirname, '../../gcyber-inventory/ui/assets/items'),
+    path.join(process.cwd(), 'resources', 'gcyber-inventory', 'ui', 'assets', 'items'),
+    path.resolve(__dirname, '../ui/assets/items')
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) return dir;
+  }
+  return null;
+}
+
+function getIconDataUri(imagePath) {
+  if (!imagePath) return null;
+  const fileName = path.basename(String(imagePath).split('?')[0]);
+  if (!fileName) return null;
+  if (IconDataCache.has(fileName)) return IconDataCache.get(fileName);
+
+  const dir = resolveIconsDir();
+  if (!dir) return null;
+  const fullPath = path.join(dir, fileName);
+  if (!fs.existsSync(fullPath)) return null;
+
+  try {
+    const ext = path.extname(fileName).toLowerCase();
+    const mime = ext === '.svg' ? 'image/svg+xml' : (ext === '.png' ? 'image/png' : 'image/webp');
+    const b64 = fs.readFileSync(fullPath).toString('base64');
+    const uri = `data:${mime};base64,${b64}`;
+    IconDataCache.set(fileName, uri);
+    return uri;
+  } catch (e) {
+    return null;
+  }
+}
+
+function dispatchActiveIcons(player, playerSlots, containerSlots) {
+  if (!player || typeof player.emit !== 'function') return;
+  if (!player._sentInvIcons) player._sentInvIcons = new Set();
+
+  const pending = [];
+  const collect = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (const s of arr) {
+      if (!s) continue;
+      const def = getDef(s.id || s.name);
+      if (!def || !def.image) continue;
+      const fileName = path.basename(String(def.image).split('?')[0]);
+      if (!fileName || player._sentInvIcons.has(fileName)) continue;
+      const uri = getIconDataUri(def.image);
+      if (uri) {
+        player._sentInvIcons.add(fileName);
+        pending.push([fileName, uri]);
+      }
+    }
+  };
+
+  collect(playerSlots);
+  collect(containerSlots);
+
+  pending.forEach(([fileName, uri], idx) => {
+    const sendFn = () => {
+      try {
+        if (player && typeof player.emit === 'function') {
+          player.emit('gcyber:inventory:clientIcon', fileName, uri);
+        }
+      } catch (e) {}
+    };
+    if (idx === 0) sendFn();
+    else setTimeout(sendFn, idx * 12);
+  });
+}
+
 // Helper: Build slim definition map for active items (keeping curated + visible catalog items)
 function buildActiveDefinitions(playerSlots, containerSlots) {
   const defs = Object.assign({}, SharedItems.Curated || {});
@@ -374,8 +448,10 @@ async function addItem(playerOrCitizenId, itemKeyOrRecord, amount = 1, preferred
       player: {
         weight: calculateWeight(slots),
         items: slots
-      }
+      },
+      itemDefinitions: buildActiveDefinitions(slots, null)
     }));
+    dispatchActiveIcons(mpPlayer, slots, null);
   }
 
   return left === 0;
@@ -423,6 +499,10 @@ async function removeItem(playerOrCitizenId, itemKeyOrRecord, amount = 1, slotId
 
 function mountInventoryEvents() {
   if (typeof mp === 'undefined' || !mp.events) return;
+
+  mp.events.onClient('gcyber:inventory:serverResetIcons', (player) => {
+    if (player) player._sentInvIcons = new Set();
+  });
 
   // 1. Open Inventory Request
   mp.events.onClient('gcyber:inventory:serverOpen', async (player, containerReqJson) => {
@@ -499,6 +579,7 @@ function mountInventoryEvents() {
       container: containerData,
       itemDefinitions: buildActiveDefinitions(playerSlots, containerData ? containerData.items : null)
     }));
+    dispatchActiveIcons(player, playerSlots, containerData ? containerData.items : null);
   });
 
   // 2. Drag & Drop Move Item (Between Slots / Containers)
@@ -593,8 +674,10 @@ function mountInventoryEvents() {
         id: container.id,
         weight: calculateWeight(container.items),
         items: container.items
-      } : null
+      } : null,
+      itemDefinitions: buildActiveDefinitions(playerSlots, container ? container.items : null)
     }));
+    dispatchActiveIcons(player, playerSlots, container ? container.items : null);
   });
 
   // 3. Use Item Action (Weapons, Ammo, Meds, Food, Drinks, Grenades, Mods, Clothing, Tools)
