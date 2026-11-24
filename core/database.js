@@ -402,7 +402,7 @@ class DatabaseEngine {
             metadata: tryParse(row.metadata, {}),
             inventory: tryParse(row.inventory, []),
             clothing: tryParse(row.clothing, {}),
-            position: tryParse(row.position, [-1392.6, 1271.5, 123.0])
+            position: tryParse(row.position, [-1375.0, 1245.0, 24.5])
           };
           this.players.set(row.citizenid, char);
         }

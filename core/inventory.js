@@ -3,6 +3,8 @@
 // Multi-Container, Drag & Drop, Persistence & REDengine Weapon Bridge
 // =====================================================================
 
+const fs = require('fs');
+const path = require('path');
 const SharedItems = require('../shared/items');
 
 console.log('[G-CyberRPcore] Mounting Advanced Neural Inventory Matrix Server Engine...');
@@ -16,10 +18,35 @@ const InvConfig = {
   drop: { maxSlots: 10, maxWeight: 50.0 }
 };
 
-// In-Memory Secondary Containers & Ground Drops
+// In-Memory Player Cache, Secondary Containers & Ground Drops
+const PlayerInventories = new Map();
 const ActiveContainers = new Map();
 const GroundDrops = new Map();
 let dropCounter = 1000;
+
+const INV_FALLBACK_FILE = path.join(process.cwd(), 'database', 'inventories.json');
+
+function loadFallbackMap() {
+  try {
+    if (fs.existsSync(INV_FALLBACK_FILE)) {
+      const raw = fs.readFileSync(INV_FALLBACK_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      for (const [cid, arr] of Object.entries(parsed)) {
+        if (Array.isArray(arr)) PlayerInventories.set(cid, arr);
+      }
+    }
+  } catch (e) {}
+}
+
+function saveFallbackMap() {
+  try {
+    const dir = path.dirname(INV_FALLBACK_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(INV_FALLBACK_FILE, JSON.stringify(Object.fromEntries(PlayerInventories), null, 2), 'utf-8');
+  } catch (e) {}
+}
+
+loadFallbackMap();
 
 // Helper: Calculate total weight
 function calculateWeight(items) {
@@ -70,9 +97,42 @@ function getCitizenId(player) {
 
 async function loadPlayerInventory(citizenId) {
   const maxSlots = InvConfig.player.maxSlots;
+
+  // Use SQL when DB engine is actively connected and cache is not yet loaded from SQL
+  const dbReady = Boolean(global.G_CyberCore && global.G_CyberCore.DB && global.G_CyberCore.DB.connected);
+  if (!dbReady && PlayerInventories.has(citizenId)) {
+    return PlayerInventories.get(citizenId);
+  }
+
   const slots = new Array(maxSlots).fill(null);
 
-  if (!global.G_CyberCore || !global.G_CyberCore.DB) {
+  const populateStarterGear = async () => {
+    const starterItems = [
+      { slot: 0, id: 'id_card', amount: 1, info: { citizenid: citizenId } },
+      { slot: 1, id: 'cyber_phone', amount: 1, info: {} },
+      { slot: 2, id: 'maxdoc_mk1', amount: 3, info: {} },
+      { slot: 3, id: 'water_bottle', amount: 2, info: {} },
+      { slot: 4, id: 'synth_burger', amount: 2, info: {} },
+      { slot: 5, id: 'money', amount: 500, info: {} },
+      { slot: 6, id: 'weapon_unity', amount: 1, info: { serial: `NC-${Math.floor(100000 + Math.random() * 900000)}` } },
+      { slot: 7, id: 'ammo_handgun', amount: 50, info: {} }
+    ];
+
+    for (const st of starterItems) {
+      slots[st.slot] = st;
+      if (dbReady) {
+        await global.G_CyberCore.DB.Execute(
+          'INSERT INTO player_items (citizenid, slot, item_name, amount, info) VALUES (?, ?, ?, ?, ?)',
+          [citizenId, st.slot, st.id, st.amount, JSON.stringify(st.info)]
+        );
+      }
+    }
+    PlayerInventories.set(citizenId, slots);
+    saveFallbackMap();
+  };
+
+  if (!dbReady) {
+    await populateStarterGear();
     return slots;
   }
 
@@ -101,36 +161,34 @@ async function loadPlayerInventory(citizenId) {
           };
         }
       }
+      PlayerInventories.set(citizenId, slots);
+      saveFallbackMap();
     } else {
-      // Starter Gear for new citizens
-      const starterItems = [
-        { slot: 0, id: 'id_card', amount: 1, info: { citizenid: citizenId } },
-        { slot: 1, id: 'cyber_phone', amount: 1, info: {} },
-        { slot: 2, id: 'maxdoc_mk1', amount: 3, info: {} },
-        { slot: 3, id: 'water_bottle', amount: 2, info: {} },
-        { slot: 4, id: 'synth_burger', amount: 2, info: {} },
-        { slot: 5, id: 'money', amount: 500, info: {} },
-        { slot: 6, id: 'weapon_unity', amount: 1, info: { serial: `NC-${Math.floor(100000 + Math.random() * 900000)}` } },
-        { slot: 7, id: 'ammo_handgun', amount: 50, info: {} }
-      ];
-
-      for (const st of starterItems) {
-        slots[st.slot] = st;
-        await global.G_CyberCore.DB.Execute(
-          'INSERT INTO player_items (citizenid, slot, item_name, amount, info) VALUES (?, ?, ?, ?, ?)',
-          [citizenId, st.slot, st.id, st.amount, JSON.stringify(st.info)]
-        );
-      }
+      await populateStarterGear();
     }
   } catch (err) {
     console.error(`[Inventory DB] Error loading items for ${citizenId}:`, err.message || err);
+    if (PlayerInventories.has(citizenId)) {
+      return PlayerInventories.get(citizenId);
+    }
+    await populateStarterGear();
   }
 
   return slots;
 }
 
 async function savePlayerSlot(citizenId, slotIdx, itemData) {
-  if (!global.G_CyberCore || !global.G_CyberCore.DB) return;
+  // Always persist in-memory & JSON fallback immediately
+  if (!PlayerInventories.has(citizenId)) {
+    PlayerInventories.set(citizenId, new Array(InvConfig.player.maxSlots).fill(null));
+  }
+  const cachedSlots = PlayerInventories.get(citizenId);
+  if (slotIdx >= 0 && slotIdx < cachedSlots.length) {
+    cachedSlots[slotIdx] = itemData || null;
+    saveFallbackMap();
+  }
+
+  if (!global.G_CyberCore || !global.G_CyberCore.DB || !global.G_CyberCore.DB.connected) return;
 
   try {
     if (!itemData) {

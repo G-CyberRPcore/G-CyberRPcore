@@ -831,24 +831,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const chatInputWrapper = document.getElementById('chat-input-wrapper');
   const chatInput = document.getElementById('chat-input');
   let isChatOpen = false;
+  let isAdminOpen = false;
+  let isInventoryOpen = false;
+  let lastEscapeHandledAt = 0;
+
+  function isTypingInField(e) {
+    const tag = e && e.target && e.target.tagName ? e.target.tagName.toUpperCase() : '';
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  function closeChat(silentClient) {
+    isChatOpen = false;
+    if (chatInputWrapper) chatInputWrapper.classList.remove('active');
+    if (chatInput) chatInput.blur();
+    if (!silentClient && window.mp && mp.events) {
+      mp.events.emit('chat:focus', false);
+      mp.events.emit('chatClose');
+    }
+  }
 
   function openChat() {
+    if (isAdminOpen || isInventoryOpen) return;
     isChatOpen = true;
     chatInputWrapper.classList.add('active');
     chatInput.value = '';
     chatInput.focus();
     if (window.mp && mp.events) {
       mp.events.emit('chat:focus', true);
-    }
-  }
-
-  function closeChat() {
-    isChatOpen = false;
-    chatInputWrapper.classList.remove('active');
-    chatInput.blur();
-    if (window.mp && mp.events) {
-      mp.events.emit('chat:focus', false);
-      mp.events.emit('chatClose');
     }
   }
 
@@ -861,7 +870,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       closeChat();
     } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      lastEscapeHandledAt = Date.now();
       closeChat();
+      if (window.mp && mp.events) {
+        mp.events.emit('g-cyber:ui:escapeHandled');
+      }
     }
   });
 
@@ -878,15 +893,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // =====================================================================
   // 8. Admin Control Panel (F10 / /admin)
   // =====================================================================
-  let isAdminOpen = false;
   let selectedAdminPlayerId = null;
 
-  function toggleAdminMenu(forceState) {
-    isAdminOpen = (typeof forceState === 'boolean') ? forceState : !isAdminOpen;
+  function toggleAdminMenu(forceState, fromClient) {
+    const nextState = (typeof forceState === 'boolean') ? forceState : !isAdminOpen;
+    if (isAdminOpen === nextState && viewAdmin.classList.contains('active') === nextState) {
+      return;
+    }
+    isAdminOpen = nextState;
     if (isAdminOpen) {
+      // Mutual exclusion: close inventory & chat cleanly before showing admin panel
+      if (isInventoryOpen) {
+        closeInventory(true);
+      }
+      if (isChatOpen) {
+        closeChat(true);
+      }
       viewAdmin.classList.add('active');
       if (window.mp && mp.events) {
-        mp.events.emit('admin:focus', true);
+        if (!fromClient) mp.events.emit('admin:focus', true);
         mp.events.emit('g-cyber:admin:requestData');
       } else {
         // Standalone preview
@@ -896,7 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } else {
       viewAdmin.classList.remove('active');
-      if (window.mp && mp.events) {
+      if (!fromClient && window.mp && mp.events) {
         mp.events.emit('admin:focus', false);
       }
     }
@@ -1086,7 +1111,492 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Global Keybinds
+  // =====================================================================
+  // 8B. Neural Inventory Matrix Controller (Tab / I / /inv)
+  // =====================================================================
+  const viewInventory = document.getElementById('view-inventory');
+  const btnCloseInv = document.getElementById('btn-close-inv');
+  const invClockEl = document.getElementById('inv-clock');
+
+  const invPlayerNameEl = document.getElementById('player-name');
+  const invPlayerIdEl = document.getElementById('player-id');
+  const invPlayerWeightTxt = document.getElementById('player-weight-txt');
+  const invPlayerWeightFill = document.getElementById('player-weight-fill');
+  const invPlayerHotbarGrid = document.getElementById('player-hotbar-grid');
+  const invPlayerSlotsGrid = document.getElementById('player-slots-grid');
+
+  const invContainerNameEl = document.getElementById('container-name');
+  const invContainerIdEl = document.getElementById('container-id');
+  const invContainerWeightTxt = document.getElementById('container-weight-txt');
+  const invContainerWeightFill = document.getElementById('container-weight-fill');
+  const invContainerSlotsGrid = document.getElementById('container-slots-grid');
+  const invContainerStandby = document.getElementById('container-standby');
+
+  const invItemModal = document.getElementById('item-modal');
+  const invModalCloseBtn = document.getElementById('modal-close-btn');
+  const invModalTitle = document.getElementById('modal-title');
+  const invModalCategory = document.getElementById('modal-category');
+  const invModalDesc = document.getElementById('modal-desc');
+  const invModalWeight = document.getElementById('modal-weight');
+  const invModalCount = document.getElementById('modal-count');
+  const invModalIcon = document.getElementById('modal-icon');
+  const invSplitWrap = document.getElementById('split-wrap');
+  const invSplitSlider = document.getElementById('split-slider');
+  const invSplitValTxt = document.getElementById('split-val-txt');
+  const invBtnModalUse = document.getElementById('btn-modal-use');
+  const invBtnModalSplit = document.getElementById('btn-modal-split');
+  const invBtnModalDrop = document.getElementById('btn-modal-drop');
+
+  let invPlayerData = null;
+  let invContainerData = null;
+  let invItemDefinitions = {};
+  let invSelectedSlotData = null;
+  let invAudioCtx = null;
+
+  // Custom Pointer Drag State (works reliably in CyberMP OSR CEF)
+  let pointerDragState = null; // { fromType, fromSlot, item, def, startX, startY, active, wasDragged, ghostEl, lastHoverEl }
+  let lastDragEndedAt = 0;
+
+  setInterval(() => {
+    if (invClockEl) {
+      const now = new Date();
+      invClockEl.textContent = now.toTimeString().substring(0, 5);
+    }
+  }, 1000);
+
+  function playCyberSound(type) {
+    try {
+      if (!invAudioCtx) {
+        invAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (invAudioCtx.state === 'suspended') {
+        invAudioCtx.resume();
+      }
+      const osc = invAudioCtx.createOscillator();
+      const gain = invAudioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(invAudioCtx.destination);
+
+      const now = invAudioCtx.currentTime;
+      if (type === 'click') {
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(400, now + 0.05);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      } else if (type === 'drop') {
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (type === 'use') {
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.linearRampToValueAtTime(1200, now + 0.12);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      }
+    } catch (e) {}
+  }
+
+  function cleanupPointerDrag() {
+    if (!pointerDragState) return;
+    if (pointerDragState.ghostEl && pointerDragState.ghostEl.parentNode) {
+      pointerDragState.ghostEl.parentNode.removeChild(pointerDragState.ghostEl);
+    }
+    if (pointerDragState.lastHoverEl) {
+      pointerDragState.lastHoverEl.classList.remove('drag-over');
+    }
+    if (pointerDragState.sourceEl) {
+      pointerDragState.sourceEl.style.opacity = '1';
+    }
+    pointerDragState = null;
+  }
+
+  function closeInvItemModal() {
+    invSelectedSlotData = null;
+    if (invItemModal) invItemModal.classList.add('hidden');
+  }
+
+  function closeInventory(silentClient) {
+    cleanupPointerDrag();
+    closeInvItemModal();
+    if (isInventoryOpen) playCyberSound('click');
+    isInventoryOpen = false;
+    if (viewInventory) {
+      viewInventory.classList.add('hidden');
+      viewInventory.classList.remove('active');
+    }
+    if (!silentClient && window.mp && mp.events) {
+      mp.events.emit('gcyber:inventory:cefCloseWindow');
+    }
+  }
+
+  if (btnCloseInv) {
+    btnCloseInv.addEventListener('click', () => closeInventory(false));
+  }
+
+  // Click backdrop outside modal card to close modal cleanly
+  if (invItemModal) {
+    invItemModal.addEventListener('click', (e) => {
+      if (e.target === invItemModal) {
+        closeInvItemModal();
+      }
+    });
+  }
+
+  if (invModalCloseBtn) {
+    invModalCloseBtn.addEventListener('click', () => closeInvItemModal());
+  }
+
+  if (invSplitSlider && invSplitValTxt) {
+    invSplitSlider.addEventListener('input', () => {
+      invSplitValTxt.textContent = invSplitSlider.value;
+    });
+  }
+
+  if (invBtnModalUse) {
+    invBtnModalUse.addEventListener('click', () => {
+      if (!invSelectedSlotData) return;
+      playCyberSound('use');
+      if (window.mp && mp.events) {
+        mp.events.emit('gcyber:inventory:cefUseItem', invSelectedSlotData.slotIdx);
+      }
+      closeInvItemModal();
+    });
+  }
+
+  if (invBtnModalDrop) {
+    invBtnModalDrop.addEventListener('click', () => {
+      if (!invSelectedSlotData) return;
+      playCyberSound('drop');
+      const amount = (invSplitWrap && invSplitWrap.classList.contains('hidden'))
+        ? invSelectedSlotData.item.amount
+        : parseInt(invSplitSlider.value, 10);
+      if (window.mp && mp.events) {
+        mp.events.emit('gcyber:inventory:cefDropItem', JSON.stringify({
+          slot: invSelectedSlotData.slotIdx,
+          amount: amount
+        }));
+      }
+      closeInvItemModal();
+    });
+  }
+
+  if (invBtnModalSplit) {
+    invBtnModalSplit.addEventListener('click', () => {
+      if (!invSelectedSlotData || !invPlayerData) return;
+      playCyberSound('click');
+      const splitCount = parseInt(invSplitSlider.value, 10);
+      let emptySlot = -1;
+      for (let i = 0; i < invPlayerData.items.length; i++) {
+        if (!invPlayerData.items[i]) {
+          emptySlot = i;
+          break;
+        }
+      }
+      if (emptySlot !== -1 && window.mp && mp.events) {
+        mp.events.emit('gcyber:inventory:cefMoveItem', JSON.stringify({
+          fromType: invSelectedSlotData.type,
+          fromSlot: invSelectedSlotData.slotIdx,
+          toType: invSelectedSlotData.type,
+          toSlot: emptySlot,
+          containerId: invContainerData ? invContainerData.id : null,
+          amount: splitCount
+        }));
+      }
+      closeInvItemModal();
+    });
+  }
+
+  window.addEventListener('mousemove', (e) => {
+    if (!pointerDragState) return;
+    const dx = e.clientX - pointerDragState.startX;
+    const dy = e.clientY - pointerDragState.startY;
+
+    if (!pointerDragState.active && Math.hypot(dx, dy) > 7) {
+      pointerDragState.active = true;
+      pointerDragState.wasDragged = true;
+      playCyberSound('click');
+      if (pointerDragState.sourceEl) pointerDragState.sourceEl.style.opacity = '0.45';
+
+      const ghost = document.createElement('div');
+      ghost.className = 'inv-drag-ghost';
+      ghost.innerHTML = `<span class="slot-icon">${pointerDragState.def.icon || '📦'}</span><span class="slot-name">${pointerDragState.def.label || pointerDragState.item.id}</span>`;
+      document.body.appendChild(ghost);
+      pointerDragState.ghostEl = ghost;
+    }
+
+    if (pointerDragState.active && pointerDragState.ghostEl) {
+      pointerDragState.ghostEl.style.left = `${e.clientX}px`;
+      pointerDragState.ghostEl.style.top = `${e.clientY}px`;
+
+      const elem = document.elementFromPoint(e.clientX, e.clientY);
+      const targetSlotEl = elem ? elem.closest('.inv-slot') : null;
+      if (pointerDragState.lastHoverEl && pointerDragState.lastHoverEl !== targetSlotEl) {
+        pointerDragState.lastHoverEl.classList.remove('drag-over');
+      }
+      if (targetSlotEl) {
+        targetSlotEl.classList.add('drag-over');
+      }
+      pointerDragState.lastHoverEl = targetSlotEl;
+    }
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (!pointerDragState) return;
+    const drag = pointerDragState;
+    const wasDragged = drag.active;
+    cleanupPointerDrag();
+
+    if (wasDragged) {
+      lastDragEndedAt = Date.now();
+      const elem = document.elementFromPoint(e.clientX, e.clientY);
+      const targetSlotEl = elem ? elem.closest('.inv-slot') : null;
+      if (targetSlotEl) {
+        const toType = targetSlotEl.dataset.type;
+        const toSlot = parseInt(targetSlotEl.dataset.slot, 10);
+        if (toType && !isNaN(toSlot) && (toType !== drag.fromType || toSlot !== drag.fromSlot)) {
+          playCyberSound('drop');
+          if (window.mp && mp.events) {
+            mp.events.emit('gcyber:inventory:cefMoveItem', JSON.stringify({
+              fromType: drag.fromType,
+              fromSlot: drag.fromSlot,
+              toType: toType,
+              toSlot: toSlot,
+              containerId: invContainerData ? invContainerData.id : null,
+              amount: null
+            }));
+          }
+        }
+      }
+    }
+  });
+
+  window.addEventListener('blur', cleanupPointerDrag);
+
+  function createInvSlotElement(slotIdx, item, type, isHotbar) {
+    const slotEl = document.createElement('div');
+    slotEl.className = 'inv-slot' + (isHotbar ? ' hotbar-slot' : '');
+    slotEl.dataset.slot = slotIdx;
+    slotEl.dataset.type = type;
+
+    const numEl = document.createElement('span');
+    numEl.className = 'slot-num';
+    numEl.textContent = isHotbar ? `[${slotIdx + 1}]` : `#${slotIdx + 1}`;
+    slotEl.appendChild(numEl);
+
+    if (item && item.id) {
+      const def = invItemDefinitions[item.id] || {
+        label: item.id,
+        category: 'misc',
+        weight: 0.5,
+        icon: '📦'
+      };
+
+      slotEl.dataset.itemId = item.id;
+
+      const contentEl = document.createElement('div');
+      contentEl.className = 'slot-content';
+
+      const iconEl = document.createElement('span');
+      iconEl.className = 'slot-icon';
+      iconEl.textContent = def.icon || '📦';
+      contentEl.appendChild(iconEl);
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'slot-name';
+      nameEl.textContent = def.label || item.id;
+      contentEl.appendChild(nameEl);
+
+      slotEl.appendChild(contentEl);
+
+      const bottomEl = document.createElement('div');
+      bottomEl.className = 'slot-bottom';
+
+      const weightEl = document.createElement('span');
+      const totalWeight = ((def.weight || 0.5) * (item.amount || 1)).toFixed(1);
+      weightEl.textContent = `${totalWeight}kg`;
+      bottomEl.appendChild(weightEl);
+
+      if (item.amount && item.amount > 1) {
+        const amountEl = document.createElement('span');
+        amountEl.className = 'slot-amount';
+        amountEl.textContent = `x${item.amount}`;
+        bottomEl.appendChild(amountEl);
+      }
+
+      slotEl.appendChild(bottomEl);
+
+      slotEl.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        pointerDragState = {
+          fromType: type,
+          fromSlot: slotIdx,
+          item: item,
+          def: def,
+          startX: e.clientX,
+          startY: e.clientY,
+          active: false,
+          wasDragged: false,
+          sourceEl: slotEl,
+          ghostEl: null,
+          lastHoverEl: null
+        };
+      });
+
+      slotEl.addEventListener('click', () => {
+        if (Date.now() - lastDragEndedAt < 150) return;
+        openInvItemModal(item, def, slotIdx, type);
+      });
+
+      // Right-click on player pockets quick-uses usable items
+      slotEl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (type === 'player' && def.usable) {
+          playCyberSound('use');
+          if (window.mp && mp.events) {
+            mp.events.emit('gcyber:inventory:cefUseItem', slotIdx);
+          }
+        } else {
+          openInvItemModal(item, def, slotIdx, type);
+        }
+      });
+    }
+
+    return slotEl;
+  }
+
+  function renderInventoryUI() {
+    if (!invPlayerData) return;
+
+    if (invPlayerNameEl) invPlayerNameEl.textContent = invPlayerData.name || 'CITIZEN POCKETS';
+    if (invPlayerIdEl) invPlayerIdEl.textContent = `ID: ${invPlayerData.citizenid || 'NC-0000'}`;
+
+    const pWeight = invPlayerData.weight || 0;
+    const pMaxWeight = invPlayerData.maxWeight || 120.0;
+    if (invPlayerWeightTxt) invPlayerWeightTxt.textContent = `${pWeight.toFixed(1)} / ${pMaxWeight.toFixed(1)} KG`;
+    const pPct = Math.min(100, Math.round((pWeight / pMaxWeight) * 100));
+    if (invPlayerWeightFill) invPlayerWeightFill.style.width = `${pPct}%`;
+
+    if (invPlayerHotbarGrid) {
+      invPlayerHotbarGrid.innerHTML = '';
+      for (let i = 0; i < 5; i++) {
+        const item = invPlayerData.items[i];
+        invPlayerHotbarGrid.appendChild(createInvSlotElement(i, item, 'player', true));
+      }
+    }
+
+    if (invPlayerSlotsGrid) {
+      invPlayerSlotsGrid.innerHTML = '';
+      const maxSlots = invPlayerData.maxSlots || 35;
+      for (let i = 5; i < maxSlots; i++) {
+        const item = invPlayerData.items[i];
+        invPlayerSlotsGrid.appendChild(createInvSlotElement(i, item, 'player', false));
+      }
+    }
+
+    if (invContainerData && invContainerData.items) {
+      if (invContainerStandby) invContainerStandby.classList.add('hidden');
+      if (invContainerNameEl) invContainerNameEl.textContent = invContainerData.label || 'LOCAL STORAGE';
+      if (invContainerIdEl) invContainerIdEl.textContent = invContainerData.id || 'ACTIVE';
+
+      const cWeight = invContainerData.weight || 0;
+      const cMaxWeight = invContainerData.maxWeight || 150.0;
+      if (invContainerWeightTxt) invContainerWeightTxt.textContent = `${cWeight.toFixed(1)} / ${cMaxWeight.toFixed(1)} KG`;
+      const cPct = Math.min(100, Math.round((cWeight / cMaxWeight) * 100));
+      if (invContainerWeightFill) invContainerWeightFill.style.width = `${cPct}%`;
+
+      if (invContainerSlotsGrid) {
+        invContainerSlotsGrid.innerHTML = '';
+        const cMaxSlots = invContainerData.maxSlots || 30;
+        for (let i = 0; i < cMaxSlots; i++) {
+          const item = invContainerData.items[i];
+          invContainerSlotsGrid.appendChild(createInvSlotElement(i, item, 'container', false));
+        }
+      }
+    } else {
+      if (invContainerStandby) invContainerStandby.classList.remove('hidden');
+      if (invContainerSlotsGrid) invContainerSlotsGrid.innerHTML = '';
+      if (invContainerNameEl) invContainerNameEl.textContent = 'LOCAL STORAGE';
+      if (invContainerIdEl) invContainerIdEl.textContent = 'STANDBY';
+      if (invContainerWeightTxt) invContainerWeightTxt.textContent = '0.0 / 0.0 KG';
+      if (invContainerWeightFill) invContainerWeightFill.style.width = '0%';
+    }
+  }
+
+  function openInvItemModal(item, def, slotIdx, type) {
+    invSelectedSlotData = { item, def, slotIdx, type };
+    playCyberSound('click');
+
+    if (invModalTitle) invModalTitle.textContent = def.label || item.id;
+    if (invModalCategory) invModalCategory.textContent = def.category || 'EQUIPMENT';
+    if (invModalDesc) invModalDesc.textContent = def.description || 'Standard manufactured item in Night City.';
+    if (invModalWeight) invModalWeight.textContent = `${def.weight || 0.5} KG`;
+    if (invModalCount) invModalCount.textContent = `x${item.amount || 1}`;
+    if (invModalIcon) invModalIcon.textContent = def.icon || '📦';
+
+    if (invBtnModalUse) {
+      if (def.usable && type === 'player') {
+        invBtnModalUse.classList.remove('hidden');
+      } else {
+        invBtnModalUse.classList.add('hidden');
+      }
+    }
+
+    if (item.amount && item.amount > 1 && def.stackable) {
+      if (invSplitWrap) invSplitWrap.classList.remove('hidden');
+      if (invSplitSlider) {
+        invSplitSlider.min = 1;
+        invSplitSlider.max = item.amount - 1;
+        invSplitSlider.value = Math.floor(item.amount / 2);
+      }
+      if (invSplitValTxt && invSplitSlider) invSplitValTxt.textContent = invSplitSlider.value;
+      if (invBtnModalSplit) invBtnModalSplit.classList.remove('hidden');
+    } else {
+      if (invSplitWrap) invSplitWrap.classList.add('hidden');
+      if (invBtnModalSplit) invBtnModalSplit.classList.add('hidden');
+    }
+
+    if (invItemModal) invItemModal.classList.remove('hidden');
+  }
+
+  function handleEscapePress(fromClient) {
+    const now = Date.now();
+    if (now - lastEscapeHandledAt < 150) return;
+    lastEscapeHandledAt = now;
+
+    if (viewLoading && viewLoading.classList.contains('active')) {
+      skipLoadingAndPlay();
+    } else if (viewMultichar && viewMultichar.classList.contains('active')) {
+      const deleteModal = document.getElementById('modal-delete-confirm');
+      if (deleteModal && deleteModal.style.display === 'flex') {
+        hideDeleteConfirmModal();
+      } else {
+        skipLoadingAndPlay();
+      }
+    } else if (isInventoryOpen) {
+      if (invItemModal && !invItemModal.classList.contains('hidden')) {
+        closeInvItemModal();
+      } else {
+        closeInventory(false);
+      }
+    } else if (isAdminOpen) {
+      toggleAdminMenu(false, false);
+    } else if (isChatOpen) {
+      closeChat(false);
+    }
+
+    if (!fromClient && window.mp && mp.events) {
+      mp.events.emit('g-cyber:ui:escapeHandled');
+    }
+  }
+
+  // Unified Global Keybinds
   window.addEventListener('keydown', (e) => {
     if (viewLoading && viewLoading.classList.contains('active')) {
       if (e.key === 'Enter' || e.code === 'Enter' || e.key === ' ' || e.code === 'Space') {
@@ -1095,36 +1605,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       } else if (e.key === 'Escape' || e.code === 'Escape') {
         e.preventDefault();
-        skipLoadingAndPlay();
+        handleEscapePress(false);
         return;
       }
     } else if (viewMultichar && viewMultichar.classList.contains('active')) {
       if (e.key === 'Escape' || e.code === 'Escape') {
-        const deleteModal = document.getElementById('modal-delete-confirm');
-        if (deleteModal && deleteModal.style.display === 'flex') {
-          e.preventDefault();
-          hideDeleteConfirmModal();
-          return;
-        }
         e.preventDefault();
-        skipLoadingAndPlay();
+        handleEscapePress(false);
         return;
       }
     }
 
-    if (e.key === 'F10' || e.key === 'Insert') {
+    if (e.key === 'Escape' || e.code === 'Escape') {
+      e.preventDefault();
+      handleEscapePress(false);
+    } else if (e.key === 'F10' || e.key === 'Insert') {
       e.preventDefault();
       toggleAdminMenu();
-    } else if (e.key === 't' || e.key === 'T') {
-      if (!isChatOpen && !isAdminOpen && !viewCreator.classList.contains('active')) {
+    } else if ((e.key === 'Tab' || e.key === 'i' || e.key === 'I') && isInventoryOpen && !isTypingInField(e)) {
+      e.preventDefault();
+      closeInventory(false);
+    } else if ((e.key === 't' || e.key === 'T') && !isTypingInField(e)) {
+      const inCreator = viewCreator && viewCreator.classList.contains('active');
+      const inLoading = viewLoading && viewLoading.classList.contains('active');
+      const inMultichar = viewMultichar && viewMultichar.classList.contains('active');
+      if (!isChatOpen && !isAdminOpen && !isInventoryOpen && !inCreator && !inLoading && !inMultichar) {
         e.preventDefault();
         openChat();
-      }
-    } else if (e.key === 'Escape') {
-      if (isAdminOpen) {
-        toggleAdminMenu(false);
-      } else if (isChatOpen) {
-        closeChat();
       }
     }
   });
@@ -1144,20 +1651,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     mp.events.on('g-cyber:ui:handleEscape', () => {
-      if (viewLoading && viewLoading.classList.contains('active')) {
-        skipLoadingAndPlay();
-      } else if (viewMultichar && viewMultichar.classList.contains('active')) {
-        skipLoadingAndPlay();
-      } else if (isInventoryOpen) {
-        closeInventory();
-      } else if (isAdminOpen) {
-        toggleAdminMenu(false);
-      } else if (isChatOpen) {
-        closeChat();
-      }
+      handleEscapePress(true);
     });
     mp.events.on('g-cyber:ui:closeAll', () => {
-      skipLoadingAndPlay();
+      closeInventory(true);
+      toggleAdminMenu(false, true);
+      closeChat(true);
+      if (bgAudio) bgAudio.pause();
+      showView(viewHud);
     });
     mp.events.on('g-cyber:ui:showMulticharacter', (charsJson) => {
       try {
@@ -1169,7 +1670,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     mp.events.on('g-cyber:ui:showCreator', (slot) => openCharacterCreator(slot || 1));
     mp.events.on('g-cyber:ui:showHUD', () => showView(viewHud));
-    mp.events.on('g-cyber:ui:toggleAdmin', (forceState) => toggleAdminMenu(forceState));
+    mp.events.on('g-cyber:ui:toggleAdmin', (forceState) => toggleAdminMenu(forceState, true));
 
     mp.events.on('g-cyber:hud:sync', (data) => {
       if (data.cash !== undefined) document.getElementById('hud-cash').textContent = `$${data.cash.toLocaleString()}`;
@@ -1209,442 +1710,17 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('admin-coords-display').textContent = coordsStr;
     });
 
-    // =====================================================================
-    // 6. Neural Inventory Matrix Controller (Tab / I / /inv)
-    // =====================================================================
-    const viewInventory = document.getElementById('view-inventory');
-    const btnCloseInv = document.getElementById('btn-close-inv');
-    const invClockEl = document.getElementById('inv-clock');
-
-    // Player Elements
-    const invPlayerNameEl = document.getElementById('player-name');
-    const invPlayerIdEl = document.getElementById('player-id');
-    const invPlayerWeightTxt = document.getElementById('player-weight-txt');
-    const invPlayerWeightFill = document.getElementById('player-weight-fill');
-    const invPlayerHotbarGrid = document.getElementById('player-hotbar-grid');
-    const invPlayerSlotsGrid = document.getElementById('player-slots-grid');
-
-    // Container Elements
-    const invContainerNameEl = document.getElementById('container-name');
-    const invContainerIdEl = document.getElementById('container-id');
-    const invContainerWeightTxt = document.getElementById('container-weight-txt');
-    const invContainerWeightFill = document.getElementById('container-weight-fill');
-    const invContainerSlotsGrid = document.getElementById('container-slots-grid');
-    const invContainerStandby = document.getElementById('container-standby');
-
-    // Modal Elements
-    const invItemModal = document.getElementById('item-modal');
-    const invModalCloseBtn = document.getElementById('modal-close-btn');
-    const invModalTitle = document.getElementById('modal-title');
-    const invModalCategory = document.getElementById('modal-category');
-    const invModalDesc = document.getElementById('modal-desc');
-    const invModalWeight = document.getElementById('modal-weight');
-    const invModalCount = document.getElementById('modal-count');
-    const invModalIcon = document.getElementById('modal-icon');
-    const invSplitWrap = document.getElementById('split-wrap');
-    const invSplitSlider = document.getElementById('split-slider');
-    const invSplitValTxt = document.getElementById('split-val-txt');
-    const invBtnModalUse = document.getElementById('btn-modal-use');
-    const invBtnModalSplit = document.getElementById('btn-modal-split');
-    const invBtnModalDrop = document.getElementById('btn-modal-drop');
-
-    // Inventory State
-    let isInventoryOpen = false;
-    let invPlayerData = null;
-    let invContainerData = null;
-    let invItemDefinitions = {};
-    let invSelectedSlotData = null;
-    let invDraggedElementData = null;
-
-    // Real-time Clock for Inventory
-    setInterval(() => {
-      if (invClockEl) {
-        const now = new Date();
-        invClockEl.textContent = now.toTimeString().substring(0, 5);
-      }
-    }, 1000);
-
-    // Web Audio Synthesizer for Sleek Cyberpunk Sound FX
-    let invAudioCtx = null;
-    function playCyberSound(type) {
-      try {
-        if (!invAudioCtx) {
-          invAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (invAudioCtx.state === 'suspended') {
-          invAudioCtx.resume();
-        }
-        const osc = invAudioCtx.createOscillator();
-        const gain = invAudioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(invAudioCtx.destination);
-
-        const now = invAudioCtx.currentTime;
-        if (type === 'click') {
-          osc.frequency.setValueAtTime(800, now);
-          osc.frequency.exponentialRampToValueAtTime(400, now + 0.05);
-          gain.gain.setValueAtTime(0.15, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-          osc.start(now);
-          osc.stop(now + 0.05);
-        } else if (type === 'drop') {
-          osc.frequency.setValueAtTime(400, now);
-          osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
-          gain.gain.setValueAtTime(0.2, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-          osc.start(now);
-          osc.stop(now + 0.08);
-        } else if (type === 'use') {
-          osc.frequency.setValueAtTime(600, now);
-          osc.frequency.linearRampToValueAtTime(1200, now + 0.12);
-          gain.gain.setValueAtTime(0.18, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-          osc.start(now);
-          osc.stop(now + 0.12);
-        }
-      } catch (e) {
-        // Audio fallback
-      }
-    }
-
-    // Close Inventory Handler
-    function closeInventory() {
-      playCyberSound('click');
-      isInventoryOpen = false;
-      if (viewInventory) {
-        viewInventory.classList.add('hidden');
-        viewInventory.classList.remove('active');
-      }
-      if (invItemModal) invItemModal.classList.add('hidden');
-      if (window.mp && mp.events) {
-        mp.events.emit('gcyber:inventory:cefCloseWindow');
-      }
-    }
-
-    if (btnCloseInv) btnCloseInv.addEventListener('click', closeInventory);
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' || e.key === 'Tab' || e.key === 'i' || e.key === 'I') {
-        if (isInventoryOpen) {
-          e.preventDefault();
-          closeInventory();
-        }
-      }
-    });
-
-    // Render Slots Helper
-    function createInvSlotElement(slotIdx, item, type, isHotbar) {
-      const slotEl = document.createElement('div');
-      slotEl.className = 'inv-slot' + (isHotbar ? ' hotbar-slot' : '');
-      slotEl.dataset.slot = slotIdx;
-      slotEl.dataset.type = type;
-
-      // Slot Number Display
-      const numEl = document.createElement('span');
-      numEl.className = 'slot-num';
-      numEl.textContent = isHotbar ? `[${slotIdx + 1}]` : `#${slotIdx + 1}`;
-      slotEl.appendChild(numEl);
-
-      if (item && item.id) {
-        const def = invItemDefinitions[item.id] || {
-          label: item.id,
-          category: 'misc',
-          weight: 0.5,
-          icon: '📦'
-        };
-
-        slotEl.dataset.itemId = item.id;
-        slotEl.draggable = true;
-
-        // Content (Icon & Label)
-        const contentEl = document.createElement('div');
-        contentEl.className = 'slot-content';
-
-        const iconEl = document.createElement('span');
-        iconEl.className = 'slot-icon';
-        iconEl.textContent = def.icon || '📦';
-        contentEl.appendChild(iconEl);
-
-        const nameEl = document.createElement('span');
-        nameEl.className = 'slot-name';
-        nameEl.textContent = def.label || item.id;
-        contentEl.appendChild(nameEl);
-
-        slotEl.appendChild(contentEl);
-
-        // Bottom info (Weight & Amount)
-        const bottomEl = document.createElement('div');
-        bottomEl.className = 'slot-bottom';
-
-        const weightEl = document.createElement('span');
-        const totalWeight = ((def.weight || 0.5) * (item.amount || 1)).toFixed(1);
-        weightEl.textContent = `${totalWeight}kg`;
-        bottomEl.appendChild(weightEl);
-
-        if (item.amount && item.amount > 1) {
-          const amountEl = document.createElement('span');
-          amountEl.className = 'slot-amount';
-          amountEl.textContent = `x${item.amount}`;
-          bottomEl.appendChild(amountEl);
-        }
-
-        slotEl.appendChild(bottomEl);
-
-        // Click to open item action modal
-        slotEl.addEventListener('click', () => {
-          openInvItemModal(item, def, slotIdx, type);
-        });
-
-        // Drag & Drop Handlers
-        slotEl.addEventListener('dragstart', (e) => {
-          invDraggedElementData = {
-            fromType: type,
-            fromSlot: slotIdx,
-            item: item
-          };
-          e.dataTransfer.setData('text/plain', JSON.stringify(invDraggedElementData));
-          slotEl.style.opacity = '0.5';
-          playCyberSound('click');
-        });
-
-        slotEl.addEventListener('dragend', () => {
-          slotEl.style.opacity = '1';
-        });
-      }
-
-      // Drop Target Handlers
-      slotEl.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        slotEl.classList.add('drag-over');
-      });
-
-      slotEl.addEventListener('dragleave', () => {
-        slotEl.classList.remove('drag-over');
-      });
-
-      slotEl.addEventListener('drop', (e) => {
-        e.preventDefault();
-        slotEl.classList.remove('drag-over');
-        playCyberSound('drop');
-
-        let dragData = null;
-        try {
-          dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
-        } catch (err) {
-          dragData = invDraggedElementData;
-        }
-
-        if (dragData) {
-          const movePayload = {
-            fromType: dragData.fromType,
-            fromSlot: dragData.fromSlot,
-            toType: type,
-            toSlot: slotIdx,
-            containerId: invContainerData ? invContainerData.id : null,
-            amount: null // Full stack move
-          };
-
-          if (window.mp && mp.events) {
-            mp.events.emit('gcyber:inventory:cefMoveItem', JSON.stringify(movePayload));
-          }
-        }
-      });
-
-      return slotEl;
-    }
-
-    // Render Full Inventory UI
-    function renderInventoryUI() {
-      if (!invPlayerData) return;
-
-      // 1. Render Player Header
-      if (invPlayerNameEl) invPlayerNameEl.textContent = invPlayerData.name || 'CITIZEN POCKETS';
-      if (invPlayerIdEl) invPlayerIdEl.textContent = `ID: ${invPlayerData.citizenid || 'NC-0000'}`;
-
-      const pWeight = invPlayerData.weight || 0;
-      const pMaxWeight = invPlayerData.maxWeight || 120.0;
-      if (invPlayerWeightTxt) invPlayerWeightTxt.textContent = `${pWeight.toFixed(1)} / ${pMaxWeight.toFixed(1)} KG`;
-      const pPct = Math.min(100, Math.round((pWeight / pMaxWeight) * 100));
-      if (invPlayerWeightFill) invPlayerWeightFill.style.width = `${pPct}%`;
-
-      // 2. Render Player Hotbar (Slots 0 to 4)
-      if (invPlayerHotbarGrid) {
-        invPlayerHotbarGrid.innerHTML = '';
-        for (let i = 0; i < 5; i++) {
-          const item = invPlayerData.items[i];
-          const slotEl = createInvSlotElement(i, item, 'player', true);
-          invPlayerHotbarGrid.appendChild(slotEl);
-        }
-      }
-
-      // 3. Render Player Main Slots (Slots 5 to maxSlots - 1)
-      if (invPlayerSlotsGrid) {
-        invPlayerSlotsGrid.innerHTML = '';
-        const maxSlots = invPlayerData.maxSlots || 35;
-        for (let i = 5; i < maxSlots; i++) {
-          const item = invPlayerData.items[i];
-          const slotEl = createInvSlotElement(i, item, 'player', false);
-          invPlayerSlotsGrid.appendChild(slotEl);
-        }
-      }
-
-      // 4. Render Container (if available)
-      if (invContainerData && invContainerData.items) {
-        if (invContainerStandby) invContainerStandby.classList.add('hidden');
-        if (invContainerNameEl) invContainerNameEl.textContent = invContainerData.label || 'LOCAL STORAGE';
-        if (invContainerIdEl) invContainerIdEl.textContent = invContainerData.id || 'ACTIVE';
-
-        const cWeight = invContainerData.weight || 0;
-        const cMaxWeight = invContainerData.maxWeight || 150.0;
-        if (invContainerWeightTxt) invContainerWeightTxt.textContent = `${cWeight.toFixed(1)} / ${cMaxWeight.toFixed(1)} KG`;
-        const cPct = Math.min(100, Math.round((cWeight / cMaxWeight) * 100));
-        if (invContainerWeightFill) invContainerWeightFill.style.width = `${cPct}%`;
-
-        if (invContainerSlotsGrid) {
-          invContainerSlotsGrid.innerHTML = '';
-          const cMaxSlots = invContainerData.maxSlots || 30;
-          for (let i = 0; i < cMaxSlots; i++) {
-            const item = invContainerData.items[i];
-            const slotEl = createInvSlotElement(i, item, 'container', false);
-            invContainerSlotsGrid.appendChild(slotEl);
-          }
-        }
-      } else {
-        if (invContainerStandby) invContainerStandby.classList.remove('hidden');
-        if (invContainerSlotsGrid) invContainerSlotsGrid.innerHTML = '';
-        if (invContainerNameEl) invContainerNameEl.textContent = 'LOCAL STORAGE';
-        if (invContainerIdEl) invContainerIdEl.textContent = 'STANDBY';
-        if (invContainerWeightTxt) invContainerWeightTxt.textContent = '0.0 / 0.0 KG';
-        if (invContainerWeightFill) invContainerWeightFill.style.width = '0%';
-      }
-    }
-
-    // Open Item Detail & Action Modal
-    function openInvItemModal(item, def, slotIdx, type) {
-      invSelectedSlotData = { item, def, slotIdx, type };
-      playCyberSound('click');
-
-      if (invModalTitle) invModalTitle.textContent = def.label || item.id;
-      if (invModalCategory) invModalCategory.textContent = def.category || 'EQUIPMENT';
-      if (invModalDesc) invModalDesc.textContent = def.description || 'Standard manufactured item in Night City.';
-      if (invModalWeight) invModalWeight.textContent = `${def.weight || 0.5} KG`;
-      if (invModalCount) invModalCount.textContent = `x${item.amount || 1}`;
-      if (invModalIcon) invModalIcon.textContent = def.icon || '📦';
-
-      // Usable button
-      if (invBtnModalUse) {
-        if (def.usable && type === 'player') {
-          invBtnModalUse.classList.remove('hidden');
-        } else {
-          invBtnModalUse.classList.add('hidden');
-        }
-      }
-
-      // Split Stack Slider
-      if (item.amount && item.amount > 1 && def.stackable) {
-        if (invSplitWrap) invSplitWrap.classList.remove('hidden');
-        if (invSplitSlider) {
-          invSplitSlider.min = 1;
-          invSplitSlider.max = item.amount - 1;
-          invSplitSlider.value = Math.floor(item.amount / 2);
-        }
-        if (invSplitValTxt && invSplitSlider) invSplitValTxt.textContent = invSplitSlider.value;
-        if (invBtnModalSplit) invBtnModalSplit.classList.remove('hidden');
-      } else {
-        if (invSplitWrap) invSplitWrap.classList.add('hidden');
-        if (invBtnModalSplit) invBtnModalSplit.classList.add('hidden');
-      }
-
-      if (invItemModal) invItemModal.classList.remove('hidden');
-    }
-
-    if (invModalCloseBtn) {
-      invModalCloseBtn.addEventListener('click', () => {
-        if (invItemModal) invItemModal.classList.add('hidden');
-        invSelectedSlotData = null;
-      });
-    }
-
-    if (invSplitSlider && invSplitValTxt) {
-      invSplitSlider.addEventListener('input', () => {
-        invSplitValTxt.textContent = invSplitSlider.value;
-      });
-    }
-
-    // Action Button: USE
-    if (invBtnModalUse) {
-      invBtnModalUse.addEventListener('click', () => {
-        if (!invSelectedSlotData) return;
-        playCyberSound('use');
-        if (window.mp && mp.events) {
-          mp.events.emit('gcyber:inventory:cefUseItem', invSelectedSlotData.slotIdx);
-        }
-        if (invItemModal) invItemModal.classList.add('hidden');
-        invSelectedSlotData = null;
-      });
-    }
-
-    // Action Button: DROP
-    if (invBtnModalDrop) {
-      invBtnModalDrop.addEventListener('click', () => {
-        if (!invSelectedSlotData) return;
-        playCyberSound('drop');
-        const amount = (invSplitWrap && invSplitWrap.classList.contains('hidden'))
-          ? invSelectedSlotData.item.amount
-          : parseInt(invSplitSlider.value, 10);
-        if (window.mp && mp.events) {
-          mp.events.emit('gcyber:inventory:cefDropItem', JSON.stringify({
-            slot: invSelectedSlotData.slotIdx,
-            amount: amount
-          }));
-        }
-        if (invItemModal) invItemModal.classList.add('hidden');
-        invSelectedSlotData = null;
-      });
-    }
-
-    // Action Button: SPLIT
-    if (invBtnModalSplit) {
-      invBtnModalSplit.addEventListener('click', () => {
-        if (!invSelectedSlotData || !invPlayerData) return;
-        playCyberSound('click');
-        const splitCount = parseInt(invSplitSlider.value, 10);
-
-        // Find first empty slot in player pockets
-        let emptySlot = -1;
-        for (let i = 0; i < invPlayerData.items.length; i++) {
-          if (!invPlayerData.items[i]) {
-            emptySlot = i;
-            break;
-          }
-        }
-
-        if (emptySlot !== -1 && window.mp && mp.events) {
-          mp.events.emit('gcyber:inventory:cefMoveItem', JSON.stringify({
-            fromType: invSelectedSlotData.type,
-            fromSlot: invSelectedSlotData.slotIdx,
-            toType: invSelectedSlotData.type,
-            toSlot: emptySlot,
-            containerId: invContainerData ? invContainerData.id : null,
-            amount: splitCount
-          }));
-        }
-
-        if (invItemModal) invItemModal.classList.add('hidden');
-        invSelectedSlotData = null;
-      });
-    }
-
-    // CEF Event Listeners for Inventory
     mp.events.on('gcyber:inventory:cefOpen', (jsonStr) => {
       try {
         const payload = (typeof jsonStr === 'string') ? JSON.parse(jsonStr) : jsonStr;
         invPlayerData = payload.player;
         invContainerData = payload.container;
-        if (payload.itemDefinitions) {
+        if (payload.itemDefinitions && Object.keys(payload.itemDefinitions).length > 0) {
           invItemDefinitions = payload.itemDefinitions;
         }
 
+        // Always dismiss stale popup modal when opening/refreshing inventory view
+        closeInvItemModal();
         renderInventoryUI();
         isInventoryOpen = true;
         if (viewInventory) {
@@ -1675,12 +1751,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     mp.events.on('gcyber:inventory:cefClose', () => {
-      isInventoryOpen = false;
-      if (viewInventory) {
-        viewInventory.classList.add('hidden');
-        viewInventory.classList.remove('active');
-      }
-      if (invItemModal) invItemModal.classList.add('hidden');
+      closeInventory(true);
     });
 
     mp.events.on('chat:open', () => openChat());

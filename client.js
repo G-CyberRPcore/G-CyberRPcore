@@ -23,14 +23,20 @@ let isGodmodeActive = false;
 let isSeatbeltActive = false;
 let isAdminMenuActive = false;
 let isInventoryActive = false;
+let isChatActive = false;
+let isCefFocused = false;
 let isSpawned = false;
+
+let lastAdminToggleAt = 0;
+let lastInvToggleAt = 0;
+let lastEscapeCefAt = 0;
 
 // Creator studio coordinates (Megabuilding H10 Mirror Studio)
 const CREATOR_STUDIO_COORDS = [-1385.2, 1272.8, 124.0, 90.0];
 let currentCreatorYaw = 90.0;
 
 // Noclip state & keys
-let noclipPosition = [-1392.637, 1271.536, 123.082];
+let noclipPosition = [-1375.0, 1245.0, 24.5];
 let noclipInterval = null;
 const keyStates = {};
 
@@ -44,6 +50,7 @@ function clearNoclipKeys() {
 function safeSetFocus(keyboard, mouse) {
   try {
     clearNoclipKeys();
+    isCefFocused = Boolean(keyboard || mouse);
     if (mp.cef && typeof mp.cef.setFocus === 'function') {
       mp.cef.setFocus(Boolean(keyboard), Boolean(mouse));
     }
@@ -149,12 +156,29 @@ function spawnPlayer(x = -1375.0, y = 1245.0, z = 24.5, yaw = 90.0) {
 // =====================================================================
 
 function toggleAdminMenu(forceState) {
-  isAdminMenuActive = (forceState !== undefined) ? forceState : !isAdminMenuActive;
-  safeSetFocus(isAdminMenuActive, isAdminMenuActive);
-  if (mp.events && typeof mp.events.emitCef === 'function') {
-    mp.events.emitCef('g-cyber:ui:toggleAdmin', isAdminMenuActive);
+  const nextState = (forceState !== undefined) ? Boolean(forceState) : !isAdminMenuActive;
+  lastAdminToggleAt = Date.now();
+  isAdminMenuActive = nextState;
+
+  // Mutual exclusion: cleanly close inventory or chat when admin opens
+  if (nextState) {
+    if (isInventoryActive) {
+      isInventoryActive = false;
+      lastInvToggleAt = Date.now();
+      if (mp.events && typeof mp.events.emitCef === 'function') {
+        mp.events.emitCef('gcyber:inventory:cefClose');
+      }
+    }
+    if (isChatActive) {
+      isChatActive = false;
+    }
   }
-  console.log(`[G-CyberRPcore] Admin Menu toggled: ${isAdminMenuActive}`);
+
+  safeSetFocus(nextState, nextState);
+  if (mp.events && typeof mp.events.emitCef === 'function') {
+    mp.events.emitCef('g-cyber:ui:toggleAdmin', nextState);
+  }
+  console.log(`[G-CyberRPcore] Admin Menu toggled: ${nextState}`);
 }
 
 // Nearby vehicle detector for trunk/glovebox
@@ -199,10 +223,15 @@ function getNearbyVehicleContainer() {
 }
 
 function toggleInventory(forceState) {
-  if (isAdminMenuActive) return;
-  isInventoryActive = (forceState !== undefined) ? Boolean(forceState) : !isInventoryActive;
-  safeSetFocus(isInventoryActive, isInventoryActive);
-  if (isInventoryActive) {
+  if (isAdminMenuActive && forceState !== false) return;
+  const nextState = (forceState !== undefined) ? Boolean(forceState) : !isInventoryActive;
+  lastInvToggleAt = Date.now();
+  isInventoryActive = nextState;
+  if (nextState && isChatActive) {
+    isChatActive = false;
+  }
+  safeSetFocus(nextState, nextState);
+  if (nextState) {
     const containerReq = getNearbyVehicleContainer();
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('gcyber:inventory:serverOpen', JSON.stringify(containerReq));
@@ -227,11 +256,12 @@ function toggleInventory(forceState) {
       mp.events.emitCef('gcyber:inventory:cefClose');
     }
   }
-  console.log(`[G-CyberRPcore] Inventory toggled: ${isInventoryActive}`);
+  console.log(`[G-CyberRPcore] Inventory toggled: ${nextState}`);
 }
 
 function openChat() {
-  if (isAdminMenuActive) return;
+  if (isAdminMenuActive || isInventoryActive || isChatActive) return;
+  isChatActive = true;
   safeSetFocus(true, true);
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('chat:open');
@@ -322,7 +352,7 @@ function handleHealPlayer() {
 }
 
 function handleRevivePlayer() {
-  let rx = -1392.637, ry = 1271.536, rz = 123.082, ryaw = 1.0;
+  let rx = -1375.0, ry = 1245.0, rz = 24.5, ryaw = 90.0;
   try {
     const p = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
     if (p && typeof p.GetWorldPosition === 'function') {
@@ -877,15 +907,15 @@ registerCommand('loading', () => {
   }
 });
 registerCommand('spawn', () => {
-  spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+  spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
   safeSetFocus(false, false);
 });
 registerCommand('exit', () => {
-  spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+  spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
   safeSetFocus(false, false);
 });
 registerCommand('outside', () => {
-  spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+  spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
   safeSetFocus(false, false);
 });
 registerCommand('street', () => {
@@ -896,6 +926,9 @@ registerCommand('ui', () => {
   safeSetFocus(true, true);
 });
 registerCommand('closeui', () => {
+  isAdminMenuActive = false;
+  isInventoryActive = false;
+  isChatActive = false;
   safeSetFocus(false, false);
   if (mp.events && typeof mp.events.emitCef === 'function') {
     mp.events.emitCef('g-cyber:ui:closeAll');
@@ -924,24 +957,44 @@ try {
             // CyberMP EInputAction: 1 = IACT_Press, 2 = IACT_Release
             if (action === 1) { // Press
               keyStates[key] = true;
+              const now = Date.now();
               if (key === 121) { // IK_F10
-                toggleAdminMenu();
-              } else if (key === 9) { // IK_Tab -> Neural Inventory Matrix
-                toggleInventory();
-              } else if (key === 73) { // IK_I -> Neural Inventory Matrix
-                toggleInventory();
+                if (now - lastAdminToggleAt >= 250) {
+                  toggleAdminMenu();
+                }
+              } else if (key === 120) { // IK_F9 -> Emergency unstick to street plaza
+                spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
+                safeSetFocus(false, false);
+                if (mp.events && typeof mp.events.emitCef === 'function') {
+                  mp.events.emitCef('g-cyber:hud:notify', 'Wayfinding', 'Teleported to open Little China street plaza.', 'success');
+                }
+              } else if (key === 9 || key === 73) { // IK_Tab / IK_I -> Neural Inventory Matrix
+                if (!isChatActive && !isAdminMenuActive && (now - lastInvToggleAt >= 250)) {
+                  toggleInventory();
+                }
               } else if (key === 84) { // IK_T
-                openChat();
+                if (!isChatActive && !isInventoryActive && !isAdminMenuActive) {
+                  openChat();
+                }
               } else if (key === 66) { // IK_B
-                handleSeatbelt();
+                if (!isCefFocused) {
+                  handleSeatbelt();
+                }
               } else if (key === 27) { // IK_Escape
-                if (isInventoryActive) {
-                  toggleInventory(false);
-                } else if (mp.events && typeof mp.events.emitCef === 'function') {
-                  mp.events.emitCef('g-cyber:ui:handleEscape');
+                if (now - lastEscapeCefAt >= 250) {
+                  if (isCefFocused && mp.events && typeof mp.events.emitCef === 'function') {
+                    // Let CEF prioritize inner modals (#item-modal) before closing outer overlays
+                    mp.events.emitCef('g-cyber:ui:handleEscape');
+                  } else if (isInventoryActive) {
+                    toggleInventory(false);
+                  } else if (isAdminMenuActive) {
+                    toggleAdminMenu(false);
+                  } else if (mp.events && typeof mp.events.emitCef === 'function') {
+                    mp.events.emitCef('g-cyber:ui:handleEscape');
+                  }
                 }
               } else if (key >= 49 && key <= 53) { // IK_1 to IK_5 -> Hotbar Quickslots
-                if (!isInventoryActive && !isAdminMenuActive) {
+                if (!isInventoryActive && !isAdminMenuActive && !isChatActive && !isCefFocused) {
                   const hotbarSlot = key - 49;
                   if (mp.events && typeof mp.events.emitServer === 'function') {
                     mp.events.emitServer('gcyber:inventory:serverUseItem', hotbarSlot);
@@ -966,7 +1019,7 @@ try {
 function handleWorldReady() {
   console.log('[G-CyberRPcore] World loaded! Game environment ready.');
   if (isSpawned) {
-    spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+    spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
   }
 }
 
@@ -1003,9 +1056,12 @@ if (mp.events && typeof mp.events.onCef === 'function') {
 
   mp.events.onCef('g-cyber:loading:close', () => {
     console.log('[G-CyberRPcore] Loading screen closed. Releasing input focus to game.');
+    isAdminMenuActive = false;
+    isInventoryActive = false;
+    isChatActive = false;
     safeSetFocus(false, false);
     if (!isSpawned) {
-      spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+      spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
     }
   });
 
@@ -1043,9 +1099,22 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     }
   });
 
-  // Admin Panel Focus
+  // Admin & UI Focus Synchronization
   mp.events.onCef('admin:focus', (state) => {
-    safeSetFocus(state, state);
+    const next = Boolean(state);
+    isAdminMenuActive = next;
+    lastAdminToggleAt = Date.now();
+    safeSetFocus(next, next);
+  });
+
+  mp.events.onCef('chat:focus', (state) => {
+    const next = Boolean(state);
+    isChatActive = next;
+    safeSetFocus(next, next);
+  });
+
+  mp.events.onCef('g-cyber:ui:escapeHandled', () => {
+    lastEscapeCefAt = Date.now();
   });
 
   // Admin Self Toggles (Godmode, Noclip)
@@ -1180,6 +1249,7 @@ if (mp.events && typeof mp.events.onCef === 'function') {
 
   // Chat CEF Events
   mp.events.onCef('chatSubmit', (text) => {
+    isChatActive = false;
     safeSetFocus(false, false);
     if (!text || text.trim().length === 0) return;
     if (text.startsWith('/')) {
@@ -1188,6 +1258,8 @@ if (mp.events && typeof mp.events.onCef === 'function') {
       const args = parts.slice(1);
       if (cmd === 'admin' || cmd === 'a' || cmd === 'hub') {
         toggleAdminMenu();
+      } else if (cmd === 'inv' || cmd === 'inventory') {
+        toggleInventory();
       } else if (cmd === 'noclip') {
         setNoclip();
       } else if (cmd === 'god') {
@@ -1218,7 +1290,13 @@ if (mp.events && typeof mp.events.onCef === 'function') {
         handleTeleport(args);
       } else if (cmd === 'car' || cmd === 'veh') {
         spawnAdminVehicle(args[0]);
+      } else if (cmd === 'street' || cmd === 'spawn' || cmd === 'exit' || cmd === 'outside' || cmd === 'fix' || cmd === 'unstuck') {
+        spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
+        safeSetFocus(false, false);
       } else if (cmd === 'closeui') {
+        isAdminMenuActive = false;
+        isInventoryActive = false;
+        isChatActive = false;
         safeSetFocus(false, false);
         mp.events.emitCef('g-cyber:ui:closeAll');
       } else if (mp.events && typeof mp.events.emitServer === 'function') {
@@ -1232,12 +1310,15 @@ if (mp.events && typeof mp.events.onCef === 'function') {
   });
 
   mp.events.onCef('chatClose', () => {
+    isChatActive = false;
     safeSetFocus(false, false);
   });
 
   // Inventory CEF Events
   mp.events.onCef('gcyber:inventory:cefCloseWindow', () => {
-    toggleInventory(false);
+    isInventoryActive = false;
+    lastInvToggleAt = Date.now();
+    safeSetFocus(false, false);
   });
 
   mp.events.onCef('gcyber:inventory:cefMoveItem', (dataJson) => {
@@ -1266,6 +1347,9 @@ if (mp.events && typeof mp.events.onCef === 'function') {
 if (mp.events && typeof mp.events.onServer === 'function') {
   mp.events.onServer('g-cyber:client:toggleAdmin', () => toggleAdminMenu());
   mp.events.onServer('g-cyber:client:closeUI', () => {
+    isAdminMenuActive = false;
+    isInventoryActive = false;
+    isChatActive = false;
     safeSetFocus(false, false);
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('g-cyber:ui:closeAll');
@@ -1278,7 +1362,7 @@ if (mp.events && typeof mp.events.onServer === 'function') {
   mp.events.onServer('g-cyber:client:showCreator', () => handleSkin());
   mp.events.onServer('g-cyber:client:showMultichar', () => handleChar());
   mp.events.onServer('g-cyber:client:respawn', () => {
-    spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+    spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
     safeSetFocus(false, false);
   });
 
@@ -1293,13 +1377,19 @@ if (mp.events && typeof mp.events.onServer === 'function') {
     console.log('[G-CyberRPcore] Character successfully loaded from server. Spawning...');
     try {
       const char = (typeof charJson === 'string') ? JSON.parse(charJson) : charJson;
-      const spawnPos = (char && char.position && Array.isArray(char.position) && char.position.length >= 3)
+      let spawnPos = (char && char.position && Array.isArray(char.position) && char.position.length >= 3)
         ? char.position
-        : [-1382.0, 1272.0, 123.0];
+        : [-1375.0, 1245.0, 24.5];
+      if (Math.abs((spawnPos[2] || 0) - 123.0) < 3.0) {
+        spawnPos = [-1375.0, 1245.0, 24.5];
+      }
       spawnPlayer(spawnPos[0], spawnPos[1], spawnPos[2], 90.0);
     } catch (e) {
-      spawnPlayer(-1382.0, 1272.0, 123.0, 90.0);
+      spawnPlayer(-1375.0, 1245.0, 24.5, 90.0);
     }
+    isAdminMenuActive = false;
+    isInventoryActive = false;
+    isChatActive = false;
     safeSetFocus(false, false);
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('g-cyber:ui:characterSpawned', charJson);
