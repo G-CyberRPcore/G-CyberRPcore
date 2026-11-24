@@ -53,20 +53,53 @@ $ResourcesDir = Join-Path $ScriptDir "resources"
 $CacheDir = Join-Path $ScriptDir "cache"
 $DatabaseDir = Join-Path $ScriptDir "database"
 
-# Resolve CEF cache dynamically using standard environment variables
+# Resolve CyberMP client installation & cache directories dynamically (zero hardcoded drive letters)
+$CyberMpRootDir = $null
+$uninstallKeys = @(
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+)
+foreach ($regPath in $uninstallKeys) {
+    $entry = Get-ItemProperty $regPath -ErrorAction SilentlyContinue | Where-Object {
+        $_.DisplayName -match "CyberMP" -or $_.UninstallString -match "Uninstall CyberMP"
+    } | Select-Object -First 1
+    if ($entry) {
+        if ($entry.InstallLocation -and (Test-Path $entry.InstallLocation)) {
+            $CyberMpRootDir = $entry.InstallLocation
+            break
+        }
+        if ($entry.UninstallString -match '"?([^"]+\.exe)"?') {
+            $candidateDir = Split-Path -Parent $Matches[1]
+            if ($candidateDir -and (Test-Path $candidateDir)) {
+                $CyberMpRootDir = $candidateDir
+                break
+            }
+        }
+    }
+}
+
 $CefCacheDir = $null
-$potentialCefPaths = @()
+$ClientResourcesDir = $null
+$potentialMpDirs = @()
+if ($CyberMpRootDir) {
+    $potentialMpDirs += (Join-Path $CyberMpRootDir "resources\mp")
+}
 if ($env:ProgramData) {
-    $potentialCefPaths += Join-Path $env:ProgramData "cybermp\resources\mp\cache\cef-cache"
+    $potentialMpDirs += (Join-Path $env:ProgramData "cybermp\resources\mp")
 }
 if ($env:LOCALAPPDATA) {
-    $potentialCefPaths += Join-Path $env:LOCALAPPDATA "cybermp\cache\cef-cache"
+    $potentialMpDirs += (Join-Path $env:LOCALAPPDATA "cybermp\resources\mp")
+    $potentialMpDirs += (Join-Path $env:LOCALAPPDATA "cybermp")
 }
-foreach ($p in $potentialCefPaths) {
-    if ($p -and (Test-Path $p)) {
-        $CefCacheDir = $p
-        break
-    }
+Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | ForEach-Object {
+    $potentialMpDirs += (Join-Path $_.Root "ProgramData\cybermp\resources\mp")
+}
+foreach ($mpDir in ($potentialMpDirs | Select-Object -Unique)) {
+    $cefCandidate = Join-Path $mpDir "cache\cef-cache"
+    $resCandidate = Join-Path $mpDir "cache\client_resources"
+    if (-not $CefCacheDir -and (Test-Path $cefCandidate)) { $CefCacheDir = $cefCandidate }
+    if (-not $ClientResourcesDir -and (Test-Path $resCandidate)) { $ClientResourcesDir = $resCandidate }
 }
 
 $OfficialRepos = @(
@@ -499,6 +532,15 @@ function Clear-ServerCache {
     if ($CefCacheDir -and (Test-Path $CefCacheDir)) {
         Remove-Item -Path "$CefCacheDir\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-CyberLog "SUCCESS" "Cleared client CEF cache: $CefCacheDir"
+    }
+
+    # Clear orphaned client_resources\undefined folder if present
+    if ($ClientResourcesDir) {
+        $undefDir = Join-Path $ClientResourcesDir "undefined"
+        if (Test-Path $undefDir) {
+            Remove-Item -Path $undefDir -Recurse -Force -ErrorAction SilentlyContinue
+            Write-CyberLog "SUCCESS" "Cleared orphaned client cache folder: $undefDir"
+        }
     }
 
     Write-CyberLog "SUCCESS" "Cache refresh completed successfully."

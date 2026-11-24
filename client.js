@@ -1263,7 +1263,7 @@ try {
             if (typeof menuName === 'string' && /inventory|backpack/i.test(menuName)) {
               return false;
             }
-            return origin(menuName, userData);
+            return (typeof origin === 'function') ? origin(menuName, userData) : true;
           });
         }
       } catch (ovErr) {
@@ -1878,7 +1878,7 @@ if (mp.events && typeof mp.events.onServer === 'function') {
           eqSys.QueueRequest(req);
         }
         if (mp.events && typeof mp.events.emitCef === 'function') {
-          mp.events.emitCef('g-cyber:hud:notify', 'Tactical Gadget', `Equipped ${data.label} — Press [G] to throw.`, 'success');
+          mp.events.emitCef('g-cyber:hud:notify', 'Tactical Gadget', `Equipped ${data.label} - Press [G] to throw.`, 'success');
         }
       }, 80);
     } catch (e) {}
