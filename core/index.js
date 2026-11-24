@@ -153,6 +153,18 @@ class G_CyberCoreEngine {
     mp.events.onClient('g-cyber:server:triggerCallback', (player, name, requestId, ...args) => {
       callbacks.HandleClientRequest(player, name, requestId, ...args);
     });
+
+    // Survival Metabolism Tick (gentle Hunger & Thirst decay every 60 seconds)
+    setInterval(() => {
+      this.GetPlayers().forEach((playerObj) => {
+        if (!playerObj || !playerObj.PlayerData || !playerObj.PlayerData.metadata) return;
+        const m = playerObj.PlayerData.metadata;
+        if (m.isDead || m.isDowned) return;
+        m.hunger = Math.max(0, Number(((m.hunger ?? 100) - 0.8).toFixed(1)));
+        m.thirst = Math.max(0, Number(((m.thirst ?? 100) - 1.2).toFixed(1)));
+        playerObj.SyncHUD();
+      });
+    }, 60000);
   }
 
   registerCoreCommands() {
@@ -188,20 +200,32 @@ class G_CyberCoreEngine {
       this.Functions.Notify(player, 'Success', `Set ${target.PlayerData.name}'s job to ${jobName} (Grade ${grade}).`, 'success');
     });
 
-    // /giveitem <id> <item> <amount> (admin)
-    this.Commands.Add('giveitem', 'Spawn item for citizen', ['id', 'item', 'amount'], 'admin', (player, args) => {
-      const targetId = parseInt(args[0], 10);
-      const item = args[1];
-      const amount = parseInt(args[2] || '1', 10);
+    // /giveitem <id|item> <item|amount> [amount] (admin)
+    this.Commands.Add('giveitem', 'Spawn item for citizen', ['id', 'item', 'amount'], 'admin', async (player, args) => {
+      if (!args || args.length === 0) return;
+      let target = null;
+      let itemArg = null;
+      let amount = 1;
 
-      const target = this.GetPlayer(targetId);
+      if (!isNaN(parseInt(args[0], 10)) && args.length >= 2) {
+        target = this.GetPlayer(parseInt(args[0], 10));
+        itemArg = args[1];
+        amount = parseInt(args[2] || '1', 10);
+      } else {
+        target = this.GetPlayer(player);
+        itemArg = args[0];
+        amount = parseInt(args[1] || '1', 10);
+      }
+
       if (!target) {
-        this.Functions.Notify(player, 'Error', 'Citizen not found.', 'error');
+        if (player) this.Functions.Notify(player, 'Error', 'Citizen not found.', 'error');
         return;
       }
 
-      target.Functions.AddItem(item, amount);
-      this.Functions.Notify(player, 'Success', `Spawned ${amount}x ${item} for ${target.PlayerData.name}.`, 'success');
+      const ok = await target.Functions.AddItem(itemArg, amount);
+      if (ok && player) {
+        this.Functions.Notify(player, 'Success', `Spawned ${amount}x ${itemArg} for ${target.PlayerData.name}.`, 'success');
+      }
     });
   }
 

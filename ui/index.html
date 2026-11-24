@@ -1045,6 +1045,7 @@
         <h1 class="inv-title">NEURAL INVENTORY MATRIX <span class="accent-sub">v2.077</span></h1>
       </div>
       <div class="header-controls">
+        <button class="btn-holster hidden" id="btn-inv-holster" title="Holster Active Weapon (H)">HOLSTER [H]</button>
         <div class="header-time" id="inv-clock">23:00</div>
         <button class="btn-close" id="btn-close-inv" title="Close Inventory (ESC / TAB / I)">✕</button>
       </div>
@@ -1071,6 +1072,19 @@
               <div class="weight-bar-fill" id="player-weight-fill" style="width: 0%;"></div>
             </div>
           </div>
+        </div>
+
+        <!-- Category Filters & Item Search -->
+        <div class="inv-filter-bar">
+          <div class="inv-filter-tabs" id="inv-filter-tabs">
+            <button class="inv-filter-btn active" data-cat="all">ALL</button>
+            <button class="inv-filter-btn" data-cat="weapon">WEAPONS</button>
+            <button class="inv-filter-btn" data-cat="ammo">AMMO</button>
+            <button class="inv-filter-btn" data-cat="medicine">MEDS</button>
+            <button class="inv-filter-btn" data-cat="food">FOOD</button>
+            <button class="inv-filter-btn" data-cat="gear">GEAR</button>
+          </div>
+          <input type="text" id="inv-search-input" class="inv-search-input" placeholder="Search items..." autocomplete="off">
         </div>
 
         <!-- Hotbar Quickslots (1 - 5) -->
@@ -1130,7 +1144,7 @@
     <div class="item-modal hidden" id="item-modal">
       <div class="modal-card">
         <div class="modal-header">
-          <span class="modal-item-icon" id="modal-icon">📦</span>
+          <div class="modal-item-art" id="modal-icon">📦</div>
           <div>
             <h3 class="modal-item-title" id="modal-title">Item Name</h3>
             <span class="modal-item-cat" id="modal-category">CATEGORY</span>
@@ -1151,12 +1165,13 @@
 
         <!-- Split Stack Slider -->
         <div class="split-slider-wrap hidden" id="split-wrap">
-          <label>TRANSFER AMOUNT: <span id="split-val-txt">1</span></label>
+          <label>TRANSFER / SPLIT AMOUNT: <span id="split-val-txt">1</span></label>
           <input type="range" min="1" max="100" value="1" id="split-slider">
         </div>
 
         <div class="modal-actions">
           <button class="btn-action btn-use" id="btn-modal-use">USE</button>
+          <button class="btn-action btn-transfer hidden" id="btn-modal-transfer">TRANSFER</button>
           <button class="btn-action btn-split" id="btn-modal-split">SPLIT</button>
           <button class="btn-action btn-drop" id="btn-modal-drop">DROP</button>
         </div>
@@ -1164,6 +1179,7 @@
     </div>
   </div>
 
+  <script src="items_catalog.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

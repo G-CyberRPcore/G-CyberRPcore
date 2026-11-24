@@ -665,13 +665,40 @@ mp.events.onClient('chat:command', (player, cmdName, args = []) => {
       break;
     }
 
+    case 'giveitem': {
+      if (!isPlayerAdmin(player)) {
+        player.emit('g-cyber:client:notify', 'Access Denied', 'Admin privileges required for /giveitem.', 'error');
+        return;
+      }
+      if (!args || args.length === 0) {
+        player.emit('chat:add', 'Usage: /giveitem <itemId|TweakDB> [amount] OR /giveitem <playerId> <itemId> [amount]', 'system');
+        return;
+      }
+      let targetMp = player;
+      let itemArg = args[0];
+      let amount = 1;
+      if (!isNaN(parseInt(args[0], 10)) && args.length >= 2 && mp.players.exists(parseInt(args[0], 10))) {
+        targetMp = mp.players.at(parseInt(args[0], 10));
+        itemArg = args[1];
+        amount = parseInt(args[2] || '1', 10);
+      } else if (args.length >= 2) {
+        amount = parseInt(args[1] || '1', 10);
+      }
+      if (global.G_CyberInventory) {
+        global.G_CyberInventory.AddItem(targetMp, itemArg, amount).then((ok) => {
+          if (ok) {
+            player.emit('chat:add', `[Inventory] Granted ${amount}x ${itemArg} to ${targetMp.nickname || targetMp.id}.`, 'system');
+          }
+        });
+      }
+      break;
+    }
+
     case 'help': {
       player.emit('chat:add', '=== Night City RP Commands ===', 'system');
       player.emit('chat:add', '/me <action> • /do <state> • /ooc <msg> • /shout <msg>', 'system');
-      player.emit('chat:add', '/exit or /outside - Teleport to open atrium if trapped in a room', 'system');
-      player.emit('chat:add', '/street - Teleport to street level', 'system');
-      player.emit('chat:add', '/apartment - Toggle apartment entrance/exit', 'system');
-      player.emit('chat:add', '/tweet <msg> • /dispatch <msg> • /admin (or F10)', 'system');
+      player.emit('chat:add', '/inv (Tab/I) • /holster (H) • /exit • /street • /apartment', 'system');
+      player.emit('chat:add', '/tweet <msg> • /dispatch <msg> • /admin (F10) • /giveitem <item> [qty]', 'system');
       break;
     }
 

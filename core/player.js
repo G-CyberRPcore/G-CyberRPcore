@@ -195,83 +195,42 @@ class Player {
 
   // --- INVENTORY METHODS ---
   AddItem(itemName, amount = 1, slot = null, info = {}) {
-    const itemDef = SharedItems[itemName];
+    const resolveFn = (typeof SharedItems.Resolve === 'function') ? SharedItems.Resolve : (k) => SharedItems[k];
+    const itemDef = resolveFn(itemName);
     if (!itemDef) {
       console.warn(`[G-CyberRPcore] Unknown item definition: ${itemName}`);
       return false;
     }
 
+    if (global.G_CyberInventory && typeof global.G_CyberInventory.AddItem === 'function') {
+      return global.G_CyberInventory.AddItem(this.mp || this.PlayerData.citizenid, itemDef.id, amount, slot, info);
+    }
+
     amount = parseInt(amount, 10) || 1;
-    const maxWeight = 120.0; // standard max inventory capacity in kg
-    const itemWeight = (itemDef.weight || 0.1) * amount;
-
-    if (this.GetTotalWeight() + itemWeight > maxWeight) {
-      this.Notify('Inventory', 'Your backpack is at maximum weight capacity!', 'error');
-      return false;
-    }
-
-    // Try stacking on existing slot if not unique
-    if (!itemDef.unique) {
-      const existing = this.PlayerData.inventory.find(i => i.name === itemName);
-      if (existing) {
-        existing.amount += amount;
-        this.SyncInventory();
-        this.Notify('Item Received', `+${amount}x ${itemDef.label}`, 'success');
-        return true;
-      }
-    }
-
-    // Find first empty slot (1 - 30)
-    if (!slot) {
-      for (let s = 1; s <= 30; s++) {
-        if (!this.PlayerData.inventory.some(i => i.slot === s)) {
-          slot = s;
-          break;
-        }
-      }
-    }
-
-    if (!slot) {
-      this.Notify('Inventory', 'No empty inventory slots available.', 'error');
-      return false;
-    }
-
     this.PlayerData.inventory.push({
-      slot,
-      name: itemName,
+      slot: slot || 0,
+      name: itemDef.id,
       amount,
       info,
-      weight: itemDef.weight || 0.1
+      weight: itemDef.weight || 0.25
     });
-
     this.SyncInventory();
-    this.Notify('Item Received', `+${amount}x ${itemDef.label}`, 'success');
     return true;
   }
 
   RemoveItem(itemName, amount = 1, slot = null) {
+    if (global.G_CyberInventory && typeof global.G_CyberInventory.RemoveItem === 'function') {
+      return global.G_CyberInventory.RemoveItem(this.mp || this.PlayerData.citizenid, itemName, amount, slot);
+    }
+
     amount = parseInt(amount, 10) || 1;
-    let target = null;
-
-    if (slot) {
-      target = this.PlayerData.inventory.find(i => i.slot === slot && i.name === itemName);
-    } else {
-      target = this.PlayerData.inventory.find(i => i.name === itemName);
-    }
-
-    if (!target || target.amount < amount) {
-      this.Notify('Inventory', `You do not have enough ${itemName}.`, 'error');
-      return false;
-    }
-
+    let target = this.PlayerData.inventory.find(i => i.name === itemName);
+    if (!target || target.amount < amount) return false;
     target.amount -= amount;
     if (target.amount <= 0) {
       this.PlayerData.inventory = this.PlayerData.inventory.filter(i => i !== target);
     }
-
     this.SyncInventory();
-    const itemDef = SharedItems[itemName];
-    this.Notify('Item Removed', `-${amount}x ${itemDef ? itemDef.label : itemName}`, 'info');
     return true;
   }
 

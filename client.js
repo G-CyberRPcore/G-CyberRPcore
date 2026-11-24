@@ -864,6 +864,7 @@ registerCommand('a', () => toggleAdminMenu());
 registerCommand('hub', () => toggleAdminMenu());
 registerCommand('inv', () => toggleInventory());
 registerCommand('inventory', () => toggleInventory());
+registerCommand('holster', () => holsterActiveWeapon());
 registerCommand('noclip', () => setNoclip());
 registerCommand('god', () => setGodmode());
 registerCommand('heal', () => {
@@ -936,6 +937,309 @@ registerCommand('closeui', () => {
 });
 
 // =====================================================================
+// 5B. Native Weapon, Ammo, Mod & Consumable Bridge (CyberMP / REDengine)
+// =====================================================================
+
+let currentlyEquippedWeaponId = null;
+let currentlyEquippedWeaponNativeId = null;
+let currentlyEquippedAmmoNativeId = null;
+let lastWeaponDrawAt = 0;
+let lastAmmoSyncAt = 0;
+const armedAmmoTrack = {};
+
+function resolveEngineItemID(transSys, player, nativeId) {
+  if (!transSys || !player || !nativeId) return null;
+  try {
+    const data = transSys.GetItemDataByTDBID(player, nativeId);
+    if (data && typeof data.GetID === 'function') {
+      return data.GetID();
+    }
+  } catch (e) {}
+
+  try {
+    if (typeof transSys.GetItemList === 'function') {
+      const res = transSys.GetItemList(player);
+      const list = Array.isArray(res) && Array.isArray(res[1]) ? res[1] : (Array.isArray(res) ? res : []);
+      for (let i = 0; i < list.length; i++) {
+        const d = list[i];
+        if (!d) continue;
+        const idObj = typeof d.GetID === 'function' ? d.GetID() : null;
+        if (idObj && mp.game.gameItemID && typeof mp.game.gameItemID.IsOfTDBID === 'function' && mp.game.gameItemID.IsOfTDBID(idObj, nativeId)) {
+          return idObj;
+        }
+        if (typeof d.GetNameAsString === 'function' && d.GetNameAsString() === nativeId && idObj) {
+          return idObj;
+        }
+      }
+    }
+  } catch (e2) {}
+
+  try {
+    if (mp.game.gameItemID && typeof mp.game.gameItemID.FromTDBID === 'function') {
+      return mp.game.gameItemID.FromTDBID(nativeId);
+    }
+  } catch (e3) {}
+  return null;
+}
+
+function getEngineItemQuantity(transSys, player, tdbid) {
+  if (!transSys || !player || !tdbid) return 0;
+  try {
+    if (mp.game.gameItemID && typeof mp.game.gameItemID.CreateQuery === 'function') {
+      const q = mp.game.gameItemID.CreateQuery(tdbid);
+      return transSys.GetItemQuantity(player, q) || 0;
+    }
+  } catch (e) {}
+  try {
+    const data = transSys.GetItemDataByTDBID(player, tdbid);
+    if (data && typeof data.GetQuantity === 'function') {
+      return data.GetQuantity() || 0;
+    }
+  } catch (e2) {}
+  return 0;
+}
+
+function giveEngineItem(transSys, player, nativeId, count = 1) {
+  try {
+    if (mp.game && typeof mp.game.AddToInventory === 'function') {
+      mp.game.AddToInventory(nativeId, count);
+      return true;
+    }
+  } catch (e1) {}
+  try {
+    if (transSys && player && typeof transSys.GiveItemByTDBID === 'function') {
+      return transSys.GiveItemByTDBID(player, nativeId, count);
+    }
+  } catch (e2) {}
+  return false;
+}
+
+function syncEngineAmmo(ammoNativeId, desiredAmount) {
+  if (!ammoNativeId) return;
+  try {
+    const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    const transSys = (mp.game && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function')
+      ? mp.game.ScriptGameInstance.GetTransactionSystem()
+      : null;
+    if (!player || !transSys) return;
+
+    lastAmmoSyncAt = Date.now();
+    const curQty = getEngineItemQuantity(transSys, player, ammoNativeId);
+    const targetQty = Math.max(0, parseInt(desiredAmount, 10) || 0);
+
+    if (curQty < targetQty) {
+      giveEngineItem(transSys, player, ammoNativeId, targetQty - curQty);
+    } else if (curQty > targetQty && typeof transSys.RemoveItemByTDBID === 'function') {
+      transSys.RemoveItemByTDBID(player, ammoNativeId, curQty - targetQty, true);
+    }
+    armedAmmoTrack[ammoNativeId] = targetQty;
+    currentlyEquippedAmmoNativeId = ammoNativeId;
+  } catch (err) {
+    console.log('[G-CyberRPcore] syncEngineAmmo notice:', err);
+  }
+}
+
+function holsterActiveWeapon() {
+  try {
+    const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    if (!player) return;
+
+    const eqSys = (mp.game.EquipmentSystem && typeof mp.game.EquipmentSystem.GetInstance === 'function')
+      ? mp.game.EquipmentSystem.GetInstance(player)
+      : null;
+
+    if (eqSys && typeof mp.game.EquipmentSystemWeaponManipulationRequest === 'function') {
+      const manipReq = new mp.game.EquipmentSystemWeaponManipulationRequest();
+      manipReq.owner = player;
+      manipReq.requestType = 22; // EquipmentManipulationAction.UnequipWeapon
+      manipReq.equipAnimType = 0; // Default
+      manipReq.removeItemFromEquipSlot = false;
+      eqSys.QueueRequest(manipReq);
+    } else if (mp.game.PlayerGameplayRestrictions && typeof mp.game.PlayerGameplayRestrictions.RequestFists === 'function') {
+      mp.game.PlayerGameplayRestrictions.RequestFists(player, 0);
+    }
+
+    currentlyEquippedWeaponId = null;
+    currentlyEquippedWeaponNativeId = null;
+    currentlyEquippedAmmoNativeId = null;
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('gcyber:inventory:cefEquipped', null);
+      mp.events.emitCef('g-cyber:hud:notify', 'Holstered', 'Weapon holstered.', 'info');
+    }
+  } catch (err) {
+    console.log('[G-CyberRPcore] holsterActiveWeapon notice:', err);
+  }
+}
+
+function equipAndDrawWeapon(payloadJson, toggleIfSame = false) {
+  let data = null;
+  try {
+    data = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : { nativeId: payloadJson };
+  } catch (e) {
+    data = { nativeId: payloadJson };
+  }
+  if (!data || !data.nativeId) return;
+
+  const { nativeId, itemId, label, ammoNativeId, ammoAmount, slotIdx } = data;
+
+  if (toggleIfSame && currentlyEquippedWeaponNativeId === nativeId && (Date.now() - lastWeaponDrawAt > 400)) {
+    holsterActiveWeapon();
+    return;
+  }
+
+  try {
+    const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    const transSys = (mp.game && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function')
+      ? mp.game.ScriptGameInstance.GetTransactionSystem()
+      : null;
+    if (!player || !transSys) return;
+
+    // 1. Sync ammo FIRST so weapon immediately has available rounds to chamber & reload
+    if (ammoNativeId) {
+      syncEngineAmmo(ammoNativeId, ammoAmount || 0);
+    } else {
+      currentlyEquippedAmmoNativeId = null;
+    }
+
+    // 2. Ensure weapon exists in TransactionSystem
+    let itemData = null;
+    try {
+      itemData = transSys.GetItemDataByTDBID(player, nativeId);
+    } catch (e) {}
+    if (!itemData) {
+      giveEngineItem(transSys, player, nativeId, 1);
+    }
+
+    const weaponSlot = (typeof slotIdx === 'number' && slotIdx >= 0 && slotIdx <= 2) ? slotIdx : 0;
+
+    const finalizeEquipAndDraw = (attempt) => {
+      const realItemID = resolveEngineItemID(transSys, player, nativeId);
+      if (!realItemID && attempt < 6) {
+        setTimeout(() => finalizeEquipAndDraw(attempt + 1), 75);
+        return;
+      }
+      if (!realItemID) return;
+
+      const eqSys = (mp.game.EquipmentSystem && typeof mp.game.EquipmentSystem.GetInstance === 'function')
+        ? mp.game.EquipmentSystem.GetInstance(player)
+        : null;
+
+      // Equip into active weapon slot
+      if (eqSys && typeof mp.game.GameplayEquipRequest === 'function') {
+        try {
+          const equipReq = new mp.game.GameplayEquipRequest();
+          equipReq.owner = player;
+          equipReq.itemID = realItemID;
+          equipReq.slotIndex = weaponSlot;
+          equipReq.addToInventory = false;
+          equipReq.equipToCurrentActiveSlot = true;
+          equipReq.forceEquipWeapon = true;
+          eqSys.QueueRequest(equipReq);
+        } catch (eqErr) {}
+      }
+
+      if (typeof mp.game.MPEquipWeapon === 'function') {
+        try { mp.game.MPEquipWeapon(realItemID, weaponSlot); } catch (mpErr) {}
+      }
+
+      try {
+        const eqData = mp.game.EquipmentSystem.GetData(player);
+        if (eqData && typeof eqData.EquipItem === 'function') {
+          eqData.EquipItem(realItemID, false, true);
+        }
+      } catch (edErr) {}
+
+      // Force draw weapon into player's hands
+      setTimeout(() => {
+        try {
+          if (eqSys) {
+            if (typeof mp.game.gameDrawItemRequest === 'function') {
+              const drawReq = new mp.game.gameDrawItemRequest();
+              drawReq.owner = player;
+              drawReq.itemID = realItemID;
+              drawReq.assignOnly = false;
+              drawReq.equipAnimationType = 0;
+              eqSys.QueueRequest(drawReq);
+            }
+            if (typeof mp.game.EquipmentSystemWeaponManipulationRequest === 'function') {
+              const manipReq = new mp.game.EquipmentSystemWeaponManipulationRequest();
+              manipReq.owner = player;
+              manipReq.requestType = 2; // EquipmentManipulationAction.RequestActiveWeapon
+              manipReq.equipAnimType = 0;
+              manipReq.removeItemFromEquipSlot = false;
+              eqSys.QueueRequest(manipReq);
+            }
+          }
+        } catch (drErr) {
+          console.log('[G-CyberRPcore] DrawWeapon notice:', drErr);
+        }
+
+        // Refresh HUD ammo counter & reload if empty
+        if (ammoNativeId) {
+          setTimeout(() => {
+            try {
+              const activeWep = eqSys ? eqSys.GetActiveWeaponObject(player, 41) : null;
+              if (activeWep) {
+                if (mp.game.gameweaponObject && typeof mp.game.gameweaponObject.SendAmmoUpdateEvent === 'function') {
+                  mp.game.gameweaponObject.SendAmmoUpdateEvent(player, activeWep);
+                }
+                if (ammoAmount > 0 && typeof activeWep.IsMagazineEmpty === 'function' && activeWep.IsMagazineEmpty() && typeof activeWep.StartReload === 'function') {
+                  activeWep.StartReload();
+                }
+              }
+            } catch (ammoErr) {}
+          }, 220);
+        }
+      }, 95);
+
+      currentlyEquippedWeaponId = itemId || nativeId;
+      currentlyEquippedWeaponNativeId = nativeId;
+      lastWeaponDrawAt = Date.now();
+
+      if (isInventoryActive) {
+        toggleInventory(false);
+      }
+      if (mp.events && typeof mp.events.emitCef === 'function') {
+        mp.events.emitCef('gcyber:inventory:cefEquipped', currentlyEquippedWeaponId);
+        mp.events.emitCef('g-cyber:hud:notify', 'Armory', `Drawn ${label || nativeId}${ammoNativeId ? ` (${ammoAmount || 0} rds)` : ''}.`, 'success');
+      }
+    };
+
+    finalizeEquipAndDraw(0);
+  } catch (e) {
+    console.log('[G-CyberRPcore] equipAndDrawWeapon error:', e);
+  }
+}
+
+// Track bullets actually fired in REDengine and sync consumption to RP inventory
+setInterval(() => {
+  if (!isSpawned || !currentlyEquippedAmmoNativeId || isInventoryActive) return;
+  if (Date.now() - lastAmmoSyncAt < 1200) return;
+
+  try {
+    const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+    const transSys = (mp.game && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function')
+      ? mp.game.ScriptGameInstance.GetTransactionSystem()
+      : null;
+    if (!player || !transSys) return;
+
+    const tracked = armedAmmoTrack[currentlyEquippedAmmoNativeId];
+    if (typeof tracked !== 'number') return;
+
+    const current = getEngineItemQuantity(transSys, player, currentlyEquippedAmmoNativeId);
+    if (tracked > current) {
+      const spent = tracked - current;
+      if (spent > 0 && spent <= 150) {
+        armedAmmoTrack[currentlyEquippedAmmoNativeId] = current;
+        if (mp.events && typeof mp.events.emitServer === 'function') {
+          mp.events.emitServer('gcyber:inventory:serverConsumeAmmo', currentlyEquippedAmmoNativeId, spent);
+        }
+      }
+    }
+  } catch (e) {}
+}, 2000);
+
+// =====================================================================
 // 6. Official Engine Lifecycle Hooks (onInit & onceGameLoaded)
 // =====================================================================
 
@@ -951,6 +1255,21 @@ try {
   if (mp.game && typeof mp.game.onInit === 'function') {
     mp.game.onInit(() => {
       console.log('[G-CyberRPcore] onInit: Engine native classes ready. Binding input observer...');
+      // Suppress Cyberpunk vanilla singleplayer Inventory screen (keep Map/Pause/Escape working)
+      try {
+        if (typeof mp.game.override === 'function') {
+          mp.game.override('MenuScenario_HubMenu', 'OnHotkeySwitchToInventory', () => false);
+          mp.game.override('MenuScenario_HubMenu', 'OnOpenMenu', (self, menuName, userData, origin) => {
+            if (typeof menuName === 'string' && /inventory|backpack/i.test(menuName)) {
+              return false;
+            }
+            return origin(menuName, userData);
+          });
+        }
+      } catch (ovErr) {
+        console.log('[G-CyberRPcore] HubMenu override notice:', ovErr);
+      }
+
       try {
         if (typeof mp.game.onInputKeyEvent === 'function') {
           mp.game.onInputKeyEvent((action, key) => {
@@ -971,6 +1290,10 @@ try {
               } else if (key === 9 || key === 73) { // IK_Tab / IK_I -> Neural Inventory Matrix
                 if (!isChatActive && !isAdminMenuActive && (now - lastInvToggleAt >= 250)) {
                   toggleInventory();
+                }
+              } else if (key === 72) { // IK_H -> Quick Holster Weapon
+                if (!isChatActive && !isInventoryActive && !isAdminMenuActive && !isCefFocused && !isNoclipActive) {
+                  holsterActiveWeapon();
                 }
               } else if (key === 84) { // IK_T
                 if (!isChatActive && !isInventoryActive && !isAdminMenuActive) {
@@ -1260,6 +1583,8 @@ if (mp.events && typeof mp.events.onCef === 'function') {
         toggleAdminMenu();
       } else if (cmd === 'inv' || cmd === 'inventory') {
         toggleInventory();
+      } else if (cmd === 'holster') {
+        holsterActiveWeapon();
       } else if (cmd === 'noclip') {
         setNoclip();
       } else if (cmd === 'god') {
@@ -1337,6 +1662,10 @@ if (mp.events && typeof mp.events.onCef === 'function') {
     if (mp.events && typeof mp.events.emitServer === 'function') {
       mp.events.emitServer('gcyber:inventory:serverDropItem', dataJson);
     }
+  });
+
+  mp.events.onCef('gcyber:inventory:cefHolster', () => {
+    holsterActiveWeapon();
   });
 }
 
@@ -1422,6 +1751,24 @@ if (mp.events && typeof mp.events.onServer === 'function') {
     }
   });
 
+  mp.events.onServer('g-cyber:hud:notify', (title, msg, type) => {
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:hud:notify', title, msg, type);
+    }
+  });
+
+  mp.events.onServer('g-cyber:hud:sync', (data) => {
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:hud:sync', data);
+    }
+  });
+
+  mp.events.onServer('g-cyber:client:syncHUD', (data) => {
+    if (mp.events && typeof mp.events.emitCef === 'function') {
+      mp.events.emitCef('g-cyber:hud:sync', data);
+    }
+  });
+
   mp.events.onServer('chat:add', (text, type = 'normal') => {
     if (mp.events && typeof mp.events.emitCef === 'function') {
       mp.events.emitCef('chat:addMessage', text, type);
@@ -1443,19 +1790,207 @@ if (mp.events && typeof mp.events.onServer === 'function') {
     }
   });
 
-  mp.events.onServer('gcyber:inventory:clientEquipWeapon', (nativeId, itemId) => {
+  mp.events.onServer('gcyber:inventory:clientEquipWeapon', (payloadJson) => {
+    equipAndDrawWeapon(payloadJson, !isInventoryActive);
+  });
+
+  mp.events.onServer('gcyber:inventory:clientLoadAmmo', (payloadJson) => {
     try {
+      const data = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+      if (!data || !data.ammoNativeId || !data.amount) return;
+
       const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
-      if (player && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function') {
-        const transSys = mp.game.ScriptGameInstance.GetTransactionSystem();
-        if (transSys && nativeId) {
-          transSys.GiveItemByTDBID(player, nativeId, 1);
-          console.log(`[G-CyberRPcore] Weapon equipped: ${itemId} (${nativeId})`);
+      const transSys = (mp.game && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function')
+        ? mp.game.ScriptGameInstance.GetTransactionSystem()
+        : null;
+      if (!player || !transSys) return;
+
+      lastAmmoSyncAt = Date.now();
+      giveEngineItem(transSys, player, data.ammoNativeId, data.amount);
+      armedAmmoTrack[data.ammoNativeId] = (armedAmmoTrack[data.ammoNativeId] || 0) + data.amount;
+
+      setTimeout(() => {
+        try {
+          const eqSys = (mp.game.EquipmentSystem && typeof mp.game.EquipmentSystem.GetInstance === 'function')
+            ? mp.game.EquipmentSystem.GetInstance(player)
+            : null;
+          const activeWep = eqSys ? eqSys.GetActiveWeaponObject(player, 41) : null;
+          if (activeWep) {
+            if (mp.game.gameweaponObject && typeof mp.game.gameweaponObject.SendAmmoUpdateEvent === 'function') {
+              mp.game.gameweaponObject.SendAmmoUpdateEvent(player, activeWep);
+            }
+            if (typeof activeWep.StartReload === 'function') {
+              activeWep.StartReload();
+            }
+          }
+        } catch (reErr) {}
+      }, 90);
+    } catch (e) {
+      console.log('[G-CyberRPcore] clientLoadAmmo notice:', e);
+    }
+  });
+
+  mp.events.onServer('gcyber:inventory:clientConsumeEffect', (payloadJson) => {
+    try {
+      const eff = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+      if (!eff) return;
+      if (typeof eff.health === 'number') {
+        const engineHP = Math.max(10, Math.round((eff.health / 100) * SPAWN_HEALTH));
+        setHealth(engineHP);
+      }
+      if (mp.events && typeof mp.events.emitCef === 'function') {
+        mp.events.emitCef('g-cyber:hud:sync', eff);
+      }
+    } catch (e) {}
+  });
+
+  mp.events.onServer('gcyber:inventory:clientEquipGadget', (payloadJson) => {
+    try {
+      const data = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+      if (!data || !data.nativeId) return;
+      const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+      const transSys = (mp.game && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function')
+        ? mp.game.ScriptGameInstance.GetTransactionSystem()
+        : null;
+      if (!player || !transSys) return;
+
+      giveEngineItem(transSys, player, data.nativeId, Math.max(1, data.amount || 1));
+      setTimeout(() => {
+        const gadgetId = resolveEngineItemID(transSys, player, data.nativeId);
+        const eqSys = (mp.game.EquipmentSystem && typeof mp.game.EquipmentSystem.GetInstance === 'function')
+          ? mp.game.EquipmentSystem.GetInstance(player)
+          : null;
+        if (eqSys && gadgetId && typeof mp.game.GameplayEquipRequest === 'function') {
+          const req = new mp.game.GameplayEquipRequest();
+          req.owner = player;
+          req.itemID = gadgetId;
+          req.slotIndex = 0;
+          req.equipToCurrentActiveSlot = true;
+          eqSys.QueueRequest(req);
+        }
+        if (mp.events && typeof mp.events.emitCef === 'function') {
+          mp.events.emitCef('g-cyber:hud:notify', 'Tactical Gadget', `Equipped ${data.label} — Press [G] to throw.`, 'success');
+        }
+      }, 80);
+    } catch (e) {}
+  });
+
+  mp.events.onServer('gcyber:inventory:clientInstallMod', (payloadJson) => {
+    try {
+      const data = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+      if (!data || !data.nativeId) return;
+      const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+      const transSys = (mp.game && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function')
+        ? mp.game.ScriptGameInstance.GetTransactionSystem()
+        : null;
+      const eqSys = (player && mp.game.EquipmentSystem && typeof mp.game.EquipmentSystem.GetInstance === 'function')
+        ? mp.game.EquipmentSystem.GetInstance(player)
+        : null;
+      const modSys = (mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetModdingSystem === 'function')
+        ? mp.game.ScriptGameInstance.GetModdingSystem()
+        : null;
+      if (!player || !transSys || !eqSys || !modSys) return;
+
+      const activeWepId = eqSys.GetActiveItem(player, 41); // gamedataEquipmentArea.Weapon
+      if (!activeWepId) {
+        mp.events.emitCef('g-cyber:hud:notify', 'Weapon Mod', 'Equip & hold a compatible weapon first.', 'warning');
+        return;
+      }
+
+      giveEngineItem(transSys, player, data.nativeId, 1);
+      setTimeout(() => {
+        const partId = resolveEngineItemID(transSys, player, data.nativeId);
+        let attached = false;
+        if (partId) {
+          const slots = transSys.GetEmptySlotsOnItem(player, activeWepId) || [];
+          for (let i = 0; i < slots.length && !attached; i++) {
+            try { attached = modSys.InstallItemPart(player, activeWepId, partId, slots[i]); } catch (e1) {}
+          }
+          if (!attached) {
+            try { attached = modSys.InstallItemPart(player, activeWepId, partId); } catch (e2) {}
+          }
+        }
+        if (attached) {
+          mp.events.emitCef('g-cyber:hud:notify', 'Attachment Installed', `Installed ${data.label} on active weapon.`, 'success');
+          if (typeof data.slotIdx === 'number' && mp.events && typeof mp.events.emitServer === 'function') {
+            mp.events.emitServer('gcyber:inventory:serverConsumeSlot', data.slotIdx, 1);
+          }
+        } else {
+          mp.events.emitCef('g-cyber:hud:notify', 'Incompatible', `${data.label} does not fit the active weapon.`, 'warning');
+        }
+      }, 80);
+    } catch (e) {}
+  });
+
+  mp.events.onServer('gcyber:inventory:clientEquipClothing', (payloadJson) => {
+    try {
+      const data = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+      if (!data || !data.nativeId) return;
+      const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+      const transSys = (mp.game && mp.game.ScriptGameInstance && typeof mp.game.ScriptGameInstance.GetTransactionSystem === 'function')
+        ? mp.game.ScriptGameInstance.GetTransactionSystem()
+        : null;
+      const eqSys = (player && mp.game.EquipmentSystem && typeof mp.game.EquipmentSystem.GetInstance === 'function')
+        ? mp.game.EquipmentSystem.GetInstance(player)
+        : null;
+      if (!player || !transSys || !eqSys) return;
+
+      giveEngineItem(transSys, player, data.nativeId, 1);
+      setTimeout(() => {
+        const clothId = resolveEngineItemID(transSys, player, data.nativeId);
+        if (clothId && typeof mp.game.GameplayEquipRequest === 'function') {
+          const req = new mp.game.GameplayEquipRequest();
+          req.owner = player;
+          req.itemID = clothId;
+          req.addToInventory = false;
+          eqSys.QueueRequest(req);
+        }
+        mp.events.emitCef('g-cyber:hud:notify', 'Wardrobe', `Equipped ${data.label}.`, 'success');
+      }, 80);
+    } catch (e) {}
+  });
+
+  mp.events.onServer('gcyber:inventory:clientEquipCyberware', (payloadJson) => {
+    try {
+      const data = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+      if (!data || !data.nativeId) return;
+      const player = (mp.game && typeof mp.game.GetPlayer === 'function') ? mp.game.GetPlayer() : null;
+      const eqSys = (player && mp.game.EquipmentSystem && typeof mp.game.EquipmentSystem.GetInstance === 'function')
+        ? mp.game.EquipmentSystem.GetInstance(player)
+        : null;
+      if (eqSys && typeof eqSys.EquipCyberwareByTDBID === 'function') {
+        eqSys.EquipCyberwareByTDBID(player, data.nativeId);
+      }
+      mp.events.emitCef('g-cyber:hud:notify', 'Cyberware', `Neural link active: ${data.label}.`, 'success');
+    } catch (e) {}
+  });
+
+  mp.events.onServer('gcyber:inventory:clientLockpick', (payloadJson) => {
+    try {
+      const data = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+      const localP = (mp.players && mp.players.local) ? mp.players.local : null;
+      const pPos = (localP && localP.position) ? localP.position : [0, 0, 0];
+      let unlocked = false;
+      if (mp.vehicles && typeof mp.vehicles.toArray === 'function') {
+        for (const veh of mp.vehicles.toArray()) {
+          const vPos = veh.position || [0, 0, 0];
+          const dist = Math.hypot((pPos[0] || 0) - (vPos[0] || 0), (pPos[1] || 0) - (vPos[1] || 0));
+          if (dist <= 4.0) {
+            if (typeof veh.setLocked === 'function') veh.setLocked(false);
+            unlocked = true;
+            break;
+          }
         }
       }
-    } catch (e) {
-      console.log('[G-CyberRPcore] clientEquipWeapon notice:', e);
-    }
+      if (unlocked) {
+        mp.events.emitCef('g-cyber:hud:notify', 'Lockpick Success', 'Vehicle digital security bypassed!', 'success');
+        if (typeof data.slotIdx === 'number' && mp.events && typeof mp.events.emitServer === 'function') {
+          mp.events.emitServer('gcyber:inventory:serverConsumeSlot', data.slotIdx, 1);
+        }
+      } else {
+        mp.events.emitCef('g-cyber:hud:notify', 'Lockpick', 'No vehicle within range (4m).', 'warning');
+      }
+    } catch (e) {}
   });
 }
 
